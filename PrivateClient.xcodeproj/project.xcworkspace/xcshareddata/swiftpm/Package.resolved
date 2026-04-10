@@ -1,0 +1,33 @@
+{
+  "originHash" : "68fddc835703afc9e26eecd4b07343d708327d08bb182b12063d0af282cc1ca8",
+  "pins" : [
+    {
+      "identity" : "openssl-apple",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/partout-io/openssl-apple",
+      "state" : {
+        "revision" : "b13f4868c3f13b802b67c573edc6ae1ac919b53f",
+        "version" : "3.6.201"
+      }
+    },
+    {
+      "identity" : "partout",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/partout-io/partout",
+      "state" : {
+        "branch" : "master",
+        "revision" : "4785675b5bb847266262b26a124516ec769a0e41"
+      }
+    },
+    {
+      "identity" : "wg-go-apple",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/partout-io/wg-go-apple",
+      "state" : {
+        "revision" : "008607ceb40d42d8abec870711bbfecd49469aa1",
+        "version" : "0.0.2025063104"
+      }
+    }
+  ],
+  "version" : 3
+}
