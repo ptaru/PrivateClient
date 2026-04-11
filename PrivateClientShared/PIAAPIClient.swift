@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 protocol PIAAPIClientProtocol {
     func authenticate(username: String, password: String) async throws -> PIAAuthToken
@@ -26,7 +25,7 @@ struct PIAAPIClient: PIAAPIClientProtocol {
         var request = URLRequest(url: URL(string: "https://www.privateinternetaccess.com/api/client/v2/token")!)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
-        request.httpBody = "username=\(username.urlQueryEncoded)&password=\(password.urlQueryEncoded)"
+        request.httpBody = "username=\(username.formURLEncoded)&password=\(password.formURLEncoded)"
             .data(using: .utf8)
 
         let (data, response) = try await session.data(for: request)
@@ -189,9 +188,17 @@ private enum PIAWireGuardCurlClient {
 }
 
 private extension String {
-    var urlQueryEncoded: String {
-        addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? self
+    var formURLEncoded: String {
+        addingPercentEncoding(withAllowedCharacters: .formURLValueAllowed) ?? self
     }
+}
+
+private extension CharacterSet {
+    static let formURLValueAllowed: CharacterSet = {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return allowed
+    }()
 }
 
 private extension URLResponse {
@@ -200,18 +207,5 @@ private extension URLResponse {
               200..<300 ~= httpResponse.statusCode else {
             throw PIAAPIError.invalidResponse("HTTP status \((self as? HTTPURLResponse)?.statusCode ?? -1)")
         }
-    }
-}
-
-private extension SecCertificate {
-    static func makeCertificate(fromPEM pem: String) -> SecCertificate? {
-        let sanitized = pem
-            .replacingOccurrences(of: "-----BEGIN CERTIFICATE-----", with: "")
-            .replacingOccurrences(of: "-----END CERTIFICATE-----", with: "")
-            .replacingOccurrences(of: "\n", with: "")
-        guard let data = Data(base64Encoded: sanitized) else {
-            return nil
-        }
-        return SecCertificateCreateWithData(nil, data as CFData)
     }
 }

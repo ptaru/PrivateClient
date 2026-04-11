@@ -524,17 +524,20 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = PrivateClient/App.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClient/App.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PrivateClient;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient;
 				PRODUCT_NAME = PrivateClient;
 				REGISTER_APP_GROUPS = YES;
@@ -547,16 +550,19 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PrivateClientTunnel/Tunnel.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClientTunnel/Tunnel.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "PrivateClient Tunnel";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient.tunnel;
 				PRODUCT_NAME = PrivateClientTunnel;
 				REGISTER_APP_GROUPS = YES;
@@ -572,17 +578,20 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = PrivateClient/App.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClient/App.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PrivateClient;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient;
 				PRODUCT_NAME = PrivateClient;
 				REGISTER_APP_GROUPS = YES;
@@ -595,16 +604,19 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PrivateClientTunnel/Tunnel.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClientTunnel/Tunnel.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "PrivateClient Tunnel";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient.tunnel;
 				PRODUCT_NAME = PrivateClientTunnel;
 				REGISTER_APP_GROUPS = YES;

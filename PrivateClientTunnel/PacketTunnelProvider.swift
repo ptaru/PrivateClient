@@ -3,6 +3,7 @@ import Partout
 
 final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     private var forwarder: NEPTPForwarder?
+    private var pendingFlushTask: Task<Void, Never>?
 
     override func startTunnel(options: [String: NSObject]? = nil) async throws {
         do {
@@ -75,9 +76,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 private extension PacketTunnelProvider {
     func flushLog() {
         PartoutLogger.default.flushLog()
-        Task {
+        pendingFlushTask?.cancel()
+        pendingFlushTask = Task { [weak self] in
             try? await Task.sleep(milliseconds: Int(PrivateClientConfiguration.Log.saveInterval))
-            flushLog()
+            guard !Task.isCancelled else {
+                return
+            }
+            PartoutLogger.default.flushLog()
+            self?.pendingFlushTask = nil
         }
     }
 }
