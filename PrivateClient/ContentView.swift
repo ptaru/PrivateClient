@@ -453,13 +453,17 @@ private extension ContentView {
         Map(position: $mapPosition) {
             ForEach(mapRegions) { mapRegion in
                 Annotation(mapRegion.region.displayName, coordinate: mapRegion.coordinate) {
+                    let isSelected = mapRegion.region.selectionID == model.selectedRegionID
+                    let isConnected = model.sessionStatus == .connected && model.connectedRegion?.id == mapRegion.region.id
+                    let isEmphasized = isSelected || isConnected
+
                     ZStack {
-                        Image(systemName: mapRegion.region.selectionID == model.selectedRegionID ? "shield.fill" : "shield")
-                            .font(.system(size: mapRegion.region.selectionID == model.selectedRegionID ? 24 : 16, weight: .semibold))
+                        Image(systemName: isConnected ? "lock.shield.fill" : (isSelected ? "shield.fill" : "shield"))
+                            .font(.system(size: isEmphasized ? 24 : 16, weight: .semibold))
                             .foregroundStyle(.green)
                     }
                     .contentShape(Rectangle())
-                    .shadow(radius: mapRegion.region.selectionID == model.selectedRegionID ? 4 : 2)
+                    .shadow(radius: isEmphasized ? 4 : 2)
                     .onTapGesture {
                         pendingSidebarScrollSelectionID = mapRegion.region.selectionID
                         model.selectedRegionID = mapRegion.region.selectionID
@@ -537,7 +541,6 @@ private extension ContentView {
                     .frame(minWidth: 100)
                     .padding(.vertical, 8)
                 }
-                .buttonStyle(.borderedProminent)
                 .tint(isActuallyConnected ? .red : .green)
                 .clipShape(Capsule())
                 .disabled((!model.canConnect && !isActuallyConnected) || isBusy)
