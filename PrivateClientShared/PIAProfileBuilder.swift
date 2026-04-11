@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Network
 import Partout
 
 struct BuiltConnectionProfile {
@@ -115,10 +116,13 @@ extension PIAProfileBuilder {
         for selection: ConnectionSelection,
         handshake: PIAWireGuardHandshake?
     ) -> [String] {
-        if let handshake, !handshake.dnsServers.isEmpty {
-            return handshake.dnsServers
+        if let handshake {
+            let numericHandshakeServers = handshake.dnsServers.filter(\.isNumericIPAddress)
+            if !numericHandshakeServers.isEmpty {
+                return numericHandshakeServers
+            }
         }
-        if let dns = selection.region.dns, !dns.isEmpty {
+        if let dns = selection.region.dns, dns.isNumericIPAddress {
             return [dns]
         }
         return ["10.0.0.243"]
@@ -140,6 +144,12 @@ extension PIAProfileBuilder {
             bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
         )
         return UUID(uuid: uuid)
+    }
+}
+
+private extension String {
+    var isNumericIPAddress: Bool {
+        !isEmpty && IPv4Address(self) != nil
     }
 }
 

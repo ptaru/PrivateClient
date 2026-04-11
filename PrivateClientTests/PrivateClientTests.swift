@@ -49,4 +49,55 @@ final class PrivateClientTests: XCTestCase {
         XCTAssertEqual(handshake.serverPort, 1337)
         XCTAssertEqual(handshake.peerIP, "10.0.0.2/32")
     }
+
+    func testHostnameRegionDNSFallsBackToNumericResolver() {
+        let builder = PIAProfileBuilder(certificatePEM: "CERT")
+        let region = PIARegion(
+            id: "uk_london",
+            name: "UK London",
+            country: "GB",
+            autoRegion: nil,
+            dns: "uk-london.pvt.site",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: PIARegionServers(meta: [], ovpntcp: [], ovpnudp: [], wg: [])
+        )
+
+        let servers = builder.dnsServers(
+            for: ConnectionSelection(region: region, transport: .openVPNUDP),
+            handshake: nil
+        )
+
+        XCTAssertEqual(servers, ["10.0.0.243"])
+    }
+
+    func testNumericHandshakeDNSIsPreferred() {
+        let builder = PIAProfileBuilder(certificatePEM: "CERT")
+        let region = PIARegion(
+            id: "uk_london",
+            name: "UK London",
+            country: "GB",
+            autoRegion: nil,
+            dns: "uk-london.pvt.site",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: PIARegionServers(meta: [], ovpntcp: [], ovpnudp: [], wg: [])
+        )
+        let handshake = PIAWireGuardHandshake(
+            status: "OK",
+            serverKey: "server-key",
+            serverPort: 1337,
+            peerIP: "10.0.0.2/32",
+            dnsServers: ["10.0.0.243", "resolver.example"]
+        )
+
+        let servers = builder.dnsServers(
+            for: ConnectionSelection(region: region, transport: .wireGuard),
+            handshake: handshake
+        )
+
+        XCTAssertEqual(servers, ["10.0.0.243"])
+    }
 }
