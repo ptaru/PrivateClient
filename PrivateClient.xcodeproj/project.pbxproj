@@ -277,11 +277,9 @@
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					51CE4AE84E0D19A5D346464E = {
-						DevelopmentTeam = CM6PR6R3U2;
 						ProvisioningStyle = Automatic;
 					};
 					7A2B3E1BDCA77BDDED655D07 = {
-						DevelopmentTeam = CM6PR6R3U2;
 						ProvisioningStyle = Automatic;
 					};
 					CC080830F33E6618EDF1BD72 = {
@@ -526,12 +524,14 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = CM6PR6R3U2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClient/App.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PrivateClient;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -552,7 +552,9 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = CM6PR6R3U2;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClientTunnel/Tunnel.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "PrivateClient Tunnel";
@@ -580,12 +582,14 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = CM6PR6R3U2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClient/App.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PrivateClient;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -606,7 +610,9 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = CM6PR6R3U2;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClientTunnel/Tunnel.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "PrivateClient Tunnel";

@@ -105,6 +105,7 @@ targets:
         PRODUCT_NAME: PrivateClientTunnel
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: YES
         SKIP_INSTALL: YES
     dependencies:
       - package: Partout
