@@ -57,7 +57,7 @@ If connection fails with NE configuration errors, verify entitlements/capabiliti
 
 ## Build/Test Workflow
 
-Preferred (inside Xcode):
+Preferred to use Xcode MCP:
 - Build `PrivateClient` scheme
 - Run `PrivateClient` tests
 

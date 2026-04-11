@@ -27,10 +27,12 @@ struct ContentView: View {
     private var pendingSidebarScrollSelectionID: String?
 
     @State
-    private var mapPosition = MapCameraPosition.region(
-        MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
-            span: MKCoordinateSpan(latitudeDelta: 120, longitudeDelta: 120)
+    private var mapPosition = MapCameraPosition.camera(
+        MapCamera(
+            centerCoordinate: CLLocationCoordinate2D(latitude: 20, longitude: 0),
+            distance: 15_000_000,
+            heading: 0,
+            pitch: 0
         )
     )
 
@@ -211,10 +213,12 @@ private extension ContentView {
             }
 
             withAnimation(.spring(duration: 0.6)) {
-                mapPosition = .region(
-                    MKCoordinateRegion(
-                        center: coordinate,
-                        span: MKCoordinateSpan(latitudeDelta: 20, longitudeDelta: 20)
+                mapPosition = .camera(
+                    MapCamera(
+                        centerCoordinate: coordinate,
+                        distance: 2_600_000,
+                        heading: 0,
+                        pitch: 0
                     )
                 )
             }
@@ -829,18 +833,67 @@ private extension ContentView {
 
     var groupedRegions: [CountryRegionGroup] {
         let grouped = Dictionary(grouping: model.filteredRegions, by: \.country)
-        return grouped
-            .map { countryCode, regions in
-                CountryRegionGroup(
-                    countryCode: countryCode,
-                    regions: regions.sorted {
+        let groups: [CountryRegionGroup] = grouped.map { entry in
+                let countryCode = entry.key
+                let regions = entry.value
+                let sortedRegions: [PIARegion]
+                switch model.sidebarSortMode {
+                case .latency:
+                    sortedRegions = regions.sorted { lhs, rhs in
+                        let lhsLatency = model.latencyValue(for: lhs.selectionID)
+                        let rhsLatency = model.latencyValue(for: rhs.selectionID)
+
+                        switch (lhsLatency, rhsLatency) {
+                        case let (l?, r?):
+                            if l != r {
+                                return l < r
+                            }
+                        case (.some, .none):
+                            return true
+                        case (.none, .some):
+                            return false
+                        case (.none, .none):
+                            break
+                        }
+
+                        return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                    }
+                case .alphabetical:
+                    sortedRegions = regions.sorted {
                         $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
                     }
+                }
+
+                return CountryRegionGroup(
+                    countryCode: countryCode,
+                    regions: sortedRegions,
+                    bestLatencyMs: sortedRegions.compactMap { model.latencyValue(for: $0.selectionID) }.min()
                 )
             }
-            .sorted {
+
+        switch model.sidebarSortMode {
+        case .latency:
+            return groups.sorted { lhs, rhs in
+                switch (lhs.bestLatencyMs, rhs.bestLatencyMs) {
+                case let (l?, r?):
+                    if l != r {
+                        return l < r
+                    }
+                case (.some, .none):
+                    return true
+                case (.none, .some):
+                    return false
+                case (.none, .none):
+                    break
+                }
+
+                return lhs.countryName.localizedCaseInsensitiveCompare(rhs.countryName) == .orderedAscending
+            }
+        case .alphabetical:
+            return groups.sorted {
                 $0.countryCode.localizedCaseInsensitiveCompare($1.countryCode) == .orderedAscending
             }
+        }
     }
 
     var selectedCountryCode: String? {
@@ -903,6 +956,7 @@ private extension PIARegion {
 private struct CountryRegionGroup: Identifiable {
     let countryCode: String
     let regions: [PIARegion]
+    let bestLatencyMs: Double?
 
     var id: String {
         countryCode.uppercased()

@@ -12,6 +12,7 @@ final class AppModel: NSObject {
     var regions: [PIARegion] = []
     var selectedRegionID: String?
     var selectedTransport: VPNTransport = .wireGuard
+    var sidebarSortMode: SidebarSortMode = .latency
     var regionLatenciesMs: [String: Double] = [:]
     var connectedRegionID: String?
     var connectedTransport: VPNTransport?
@@ -375,6 +376,19 @@ final class AppModel: NSObject {
             return nil
         }
         return "\(Int(latency.rounded()))ms"
+    }
+
+    func latencyValue(for selectionID: String) -> Double? {
+        regionLatenciesMs[selectionID]
+    }
+}
+
+enum SidebarSortMode: String, CaseIterable, Identifiable, Sendable {
+    case latency
+    case alphabetical
+
+    var id: String {
+        rawValue
     }
 }
 

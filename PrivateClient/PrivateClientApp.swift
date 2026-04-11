@@ -21,6 +21,38 @@ struct PrivateClientApp: App {
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(!model.isAuthenticated || model.isBusy)
             }
+
+            CommandGroup(after: .toolbar) {
+                Divider()
+                Menu {
+                    Toggle(
+                        "By Latency",
+                        isOn: Binding(
+                            get: { model.sidebarSortMode == .latency },
+                            set: { isEnabled in
+                                if isEnabled {
+                                    model.sidebarSortMode = .latency
+                                }
+                            }
+                        )
+                    )
+
+                    Toggle(
+                        "Alphabetically",
+                        isOn: Binding(
+                            get: { model.sidebarSortMode == .alphabetical },
+                            set: { isEnabled in
+                                if isEnabled {
+                                    model.sidebarSortMode = .alphabetical
+                                }
+                            }
+                        )
+                    )
+                }
+                label: {
+                    Label("Sort Servers", systemImage: "arrow.up.arrow.down")
+                }
+            }
         }
     }
 }
