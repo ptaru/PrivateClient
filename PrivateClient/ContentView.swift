@@ -36,11 +36,14 @@ struct ContentView: View {
         )
     )
 
+    @State
+    private var hasAppliedInitialSelectionMapFocus = false
+
     private let refreshTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
     private let clockTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        if !model.isSignedIn {
+        if !model.isSignedIn || !model.isMainInterfaceReady {
             loginView
                 .containerBackground(.clear, for: .window)
                 .task {
@@ -52,6 +55,11 @@ struct ContentView: View {
                 .onReceive(clockTimer) { now in
                     timerNow = now
                 }
+                .onChange(of: model.isMainInterfaceReady) { _, isReady in
+                    if !isReady {
+                        hasAppliedInitialSelectionMapFocus = false
+                    }
+                }
         } else {
             mainView
                 .task {
@@ -62,6 +70,11 @@ struct ContentView: View {
                 }
                 .onReceive(clockTimer) { now in
                     timerNow = now
+                }
+                .onChange(of: model.isMainInterfaceReady) { _, isReady in
+                    if !isReady {
+                        hasAppliedInitialSelectionMapFocus = false
+                    }
                 }
                 .onChange(of: model.sessionStatus) { _, newStatus in
                     if newStatus == .connected {
@@ -96,59 +109,77 @@ private extension ContentView {
                     .multilineTextAlignment(.center)
             }
 
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("PIA Username")
-                        .font(.subheadline.weight(.medium))
+            if model.isSignedIn && !model.isMainInterfaceReady {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .controlSize(.regular)
+                    Text("Preparing…")
+                        .font(.headline)
+                    Text("Fetching regions and measuring latency.")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
-                    TextField("p1234567", text: $model.username)
-                        .textFieldStyle(.plain)
-                        .padding(12)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.separator, lineWidth: 0.5))
+                        .multilineTextAlignment(.center)
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("PIA Password")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    SecureField("Password", text: $model.password)
-                        .textFieldStyle(.plain)
-                        .padding(12)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.separator, lineWidth: 0.5))
-                }
-
-                if let errorMessage = model.errorMessage {
-                    HStack {
-                        Image(systemName: "exclamationmark.circle.fill")
-                        Text(errorMessage)
+                .padding(40)
+                .frame(maxWidth: 440)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 32))
+                .overlay(RoundedRectangle(cornerRadius: 32).stroke(.white.opacity(0.1), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.1), radius: 30, x: 0, y: 15)
+            } else {
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("PIA Username")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        TextField("p1234567", text: $model.username)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(.separator, lineWidth: 0.5))
                     }
-                    .foregroundStyle(.red)
-                    .font(.callout)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
 
-                Button {
-                    Task { await model.signIn() }
-                } label: {
-                    HStack {
-                        if model.isBusy {
-                            ProgressView().controlSize(.small).padding(.trailing, 4)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("PIA Password")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        SecureField("Password", text: $model.password)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(.separator, lineWidth: 0.5))
+                    }
+
+                    if let errorMessage = model.errorMessage {
+                        HStack {
+                            Image(systemName: "exclamationmark.circle.fill")
+                            Text(errorMessage)
                         }
-                        Text("Sign In")
-                            .frame(maxWidth: .infinity)
+                        .foregroundStyle(.red)
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+
+                    Button {
+                        Task { await model.signIn() }
+                    } label: {
+                        HStack {
+                            if model.isBusy {
+                                ProgressView().controlSize(.small).padding(.trailing, 4)
+                            }
+                            Text("Sign In")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(!model.canSignIn || model.isBusy)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!model.canSignIn || model.isBusy)
+                .padding(40)
+                .frame(maxWidth: 440)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 32))
+                .overlay(RoundedRectangle(cornerRadius: 32).stroke(.white.opacity(0.1), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.1), radius: 30, x: 0, y: 15)
             }
-            .padding(40)
-            .frame(maxWidth: 440)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 32))
-            .overlay(RoundedRectangle(cornerRadius: 32).stroke(.white.opacity(0.1), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.1), radius: 30, x: 0, y: 15)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -206,25 +237,40 @@ private extension ContentView {
                 .inspectorColumnWidth(min: 300, ideal: 350, max: 500)
         }
         .onChange(of: model.selectedRegionID) { _, newValue in
-            guard let newValue,
-                  let region = model.regions.first(where: { $0.selectionID == newValue }),
-                  let coordinate = RegionCoordinateResolver.coordinate(for: region) else {
+            applySelectionMapFocus(selectionID: newValue, animated: true)
+        }
+        .onAppear {
+            guard !hasAppliedInitialSelectionMapFocus else {
                 return
             }
-
-            withAnimation(.spring(duration: 0.6)) {
-                mapPosition = .camera(
-                    MapCamera(
-                        centerCoordinate: coordinate,
-                        distance: 2_600_000,
-                        heading: 0,
-                        pitch: 0
-                    )
-                )
-            }
+            hasAppliedInitialSelectionMapFocus = true
+            applySelectionMapFocus(selectionID: model.selectedRegionID, animated: true)
         }
         .onChange(of: model.selectedTransport) { _, _ in
             model.refreshLatencyMeasurements()
+        }
+    }
+
+    func applySelectionMapFocus(selectionID: String?, animated: Bool) {
+        guard let selectionID,
+              let region = model.regions.first(where: { $0.selectionID == selectionID }),
+              let coordinate = RegionCoordinateResolver.coordinate(for: region) else {
+            return
+        }
+
+        let camera = MapCamera(
+            centerCoordinate: coordinate,
+            distance: 2_600_000,
+            heading: 0,
+            pitch: 0
+        )
+
+        if animated {
+            withAnimation(.spring(duration: 0.6)) {
+                mapPosition = .camera(camera)
+            }
+        } else {
+            mapPosition = .camera(camera)
         }
     }
 
@@ -282,92 +328,101 @@ private extension ContentView {
     }
 
     var serverListPane: some View {
-        ScrollViewReader { proxy in
-            List(selection: $model.selectedRegionID) {
-                ForEach(groupedRegions) { group in
-                    if group.isCollapsible {
-                        let isExpanded = isCountryExpanded(group.countryCode)
-                        
-                        // Country Header Row
-                        HStack(alignment: .center, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(group.countryName)
-                                    .font(.subheadline.weight(.semibold))
-                                Text(group.flagDisplay)
-                                    .font(.headline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            HStack(spacing: 8) {
-                                Text("\(group.regions.count)")
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(.secondary)
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(.tertiary)
-                                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            }
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(.snappy(duration: 0.2)) {
-                                let normalizedCode = group.countryCode.uppercased()
-                                if expandedCountries.contains(normalizedCode) {
-                                    expandedCountries.remove(normalizedCode)
-                                } else {
-                                    expandedCountries.insert(normalizedCode)
-                                    // Auto-select first item when expanding
-                                    if let firstRegion = group.regions.first {
-                                        model.selectedRegionID = firstRegion.selectionID
+        Group {
+            if model.isLatencyRefreshInProgress {
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Text("Measuring latency...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
+                    List(selection: $model.selectedRegionID) {
+                        ForEach(groupedRegions) { group in
+                            if group.isCollapsible {
+                                let isExpanded = isCountryExpanded(group.countryCode)
+
+                                // Country Header Row
+                                HStack(alignment: .center, spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(group.countryName)
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(group.flagDisplay)
+                                            .font(.headline)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    HStack(spacing: 8) {
+                                        Text("\(group.regions.count)")
+                                            .font(.caption.weight(.medium))
+                                            .foregroundStyle(.secondary)
+
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(.tertiary)
+                                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
                                     }
                                 }
-                            }
-                        }
-                        
-                        if isExpanded {
-                            ForEach(group.regions, id: \.selectionID) { region in
-                                groupedRegionRow(region)
-                                    .padding(.leading, 16)
-                            }
-                        }
-                    } else if let region = group.regions.first {
-                        singleRegionCountryRow(region, countryName: group.countryName)
-                    }
-                }
-            }
-            .onChange(of: model.selectedRegionID) { _, newSelection in
-                guard let newSelection else {
-                    return
-                }
-                expandSelectionGroupIfNeeded()
-                guard pendingSidebarScrollSelectionID == newSelection else {
-                    return
-                }
+                                .padding(.vertical, 4)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    withAnimation(.snappy(duration: 0.2)) {
+                                        let normalizedCode = group.countryCode.uppercased()
+                                        if expandedCountries.contains(normalizedCode) {
+                                            expandedCountries.remove(normalizedCode)
+                                        } else {
+                                            expandedCountries.insert(normalizedCode)
+                                            // Auto-select first item when expanding
+                                            if let firstRegion = group.regions.first {
+                                                model.selectedRegionID = firstRegion.selectionID
+                                            }
+                                        }
+                                    }
+                                }
 
-                pendingSidebarScrollSelectionID = nil
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    proxy.scrollTo(newSelection, anchor: .center)
+                                if isExpanded {
+                                    ForEach(group.regions, id: \.selectionID) { region in
+                                        groupedRegionRow(region)
+                                            .padding(.leading, 16)
+                                    }
+                                }
+                            } else if let region = group.regions.first {
+                                singleRegionCountryRow(region, countryName: group.countryName)
+                            }
+                        }
+                    }
+                    .transaction { transaction in
+                        // Avoid subtle scroll-jitter when latency updates cause frequent reordering.
+                        transaction.animation = nil
+                    }
+                    .onChange(of: model.selectedRegionID) { _, newSelection in
+                        guard let newSelection else {
+                            return
+                        }
+                        expandSelectionGroupIfNeeded()
+                        guard pendingSidebarScrollSelectionID == newSelection else {
+                            return
+                        }
+
+                        pendingSidebarScrollSelectionID = nil
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            proxy.scrollTo(newSelection, anchor: .center)
+                        }
+                    }
+                    .onChange(of: model.searchText) { _, _ in
+                        expandSelectionGroupIfNeeded()
+                    }
+                    .onAppear {
+                        expandSelectionGroupIfNeeded()
+                    }
+                    .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search regions")
+                    .listStyle(.sidebar)
                 }
             }
-            .onChange(of: model.searchText) { _, _ in
-                expandSelectionGroupIfNeeded()
-            }
-            .onAppear {
-                expandSelectionGroupIfNeeded()
-                guard let selected = model.selectedRegionID else {
-                    return
-                }
-                proxy.scrollTo(selected, anchor: .center)
-                DispatchQueue.main.async {
-                    proxy.scrollTo(selected, anchor: .center)
-                }
-            }
-            .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search regions")
-            .listStyle(.sidebar)
         }
     }
 
@@ -443,7 +498,7 @@ private extension ContentView {
                     .contentShape(Rectangle())
                     .shadow(radius: isEmphasized ? 4 : 2)
                     .onTapGesture {
-                        selectRegion(mapRegion.region)
+                        selectRegion(mapRegion.region, shouldScrollSidebar: true)
                     }
                 }
             }
@@ -923,8 +978,12 @@ private extension ContentView {
         selectRegion(connectedRegion)
     }
 
-    func selectRegion(_ region: PIARegion) {
-        pendingSidebarScrollSelectionID = region.selectionID
+    func selectRegion(_ region: PIARegion, shouldScrollSidebar: Bool = false) {
+        if shouldScrollSidebar {
+            pendingSidebarScrollSelectionID = region.selectionID
+        } else {
+            pendingSidebarScrollSelectionID = nil
+        }
         model.selectedRegionID = region.selectionID
     }
 

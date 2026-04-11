@@ -99,16 +99,57 @@ final class PrivateClientTests: XCTestCase {
         XCTAssertEqual(selection, reachableRegion.selectionID)
     }
 
-    func testPingParserReadsSummaryLatency() {
-        let output = """
-        PING 1.1.1.1 (1.1.1.1): 56 data bytes
+    func testLatencyAutoSelectorPrefersMetaEndpointWhenAvailable() async {
+        let tracker = EndpointSelectionTracker()
+        let selector = LatencyBasedRegionAutoSelector(
+            latencyMeasurer: TrackingLatencyMeasurer(
+                tracker: MeasurementConcurrencyTracker(),
+                endpointTracker: tracker
+            )
+        )
 
-        --- 1.1.1.1 ping statistics ---
-        1 packets transmitted, 1 packets received, 0.0% packet loss
-        round-trip min/avg/max/stddev = 14.254/14.254/14.254/0.000 ms
-        """
+        let region = PIARegion(
+            id: "uk_london",
+            name: "UK London",
+            country: "GB",
+            autoRegion: nil,
+            dns: "10.0.0.243",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: .init(
+                meta: [.init(ip: "9.9.9.9", cn: "uk-meta", van: nil)],
+                ovpntcp: [],
+                ovpnudp: [],
+                wg: [.init(ip: "1.1.1.1", cn: "uk-wg", van: nil)]
+            )
+        )
 
-        XCTAssertEqual(ICMPPingLatencyMeasurer.parseLatency(from: output) ?? 0, 14.254, accuracy: 0.001)
+        _ = await selector.measureLatencies(from: [region], transport: .wireGuard)
+
+        let lastIPAddress = await tracker.lastIPAddress()
+        XCTAssertEqual(lastIPAddress, "9.9.9.9")
+    }
+
+    func testLatencyAutoSelectorLimitsConcurrentMeasurements() async {
+        let tracker = MeasurementConcurrencyTracker()
+        let selector = LatencyBasedRegionAutoSelector(
+            latencyMeasurer: TrackingLatencyMeasurer(tracker: tracker),
+            maxConcurrentMeasurements: 2
+        )
+
+        let regions = [
+            makeLatencyTestRegion(id: "uk_london", name: "UK London", ip: "1.1.1.1"),
+            makeLatencyTestRegion(id: "us_new_york", name: "US New York", ip: "2.2.2.2"),
+            makeLatencyTestRegion(id: "de_berlin", name: "DE Berlin", ip: "3.3.3.3"),
+            makeLatencyTestRegion(id: "jp_tokyo", name: "JP Tokyo", ip: "4.4.4.4")
+        ]
+
+        let measured = await selector.measureLatencies(from: regions, transport: .wireGuard)
+
+        XCTAssertEqual(measured.count, regions.count)
+        let maxActiveCount = await tracker.maxActiveCount()
+        XCTAssertLessThanOrEqual(maxActiveCount, 2)
     }
 
     func testServerListDecodingUsesFirstLine() throws {
@@ -255,4 +296,66 @@ private struct StubLatencyMeasurer: EndpointLatencyMeasuring {
     func measureLatency(to ipAddress: String, timeoutMilliseconds: Int) async -> Double? {
         latenciesByIP[ipAddress]
     }
+}
+
+private struct TrackingLatencyMeasurer: EndpointLatencyMeasuring {
+    let tracker: MeasurementConcurrencyTracker
+    var endpointTracker: EndpointSelectionTracker?
+
+    func measureLatency(to ipAddress: String, timeoutMilliseconds: Int) async -> Double? {
+        await endpointTracker?.record(ipAddress: ipAddress)
+        await tracker.measurementStarted()
+        try? await Task.sleep(for: .milliseconds(50))
+        await tracker.measurementFinished()
+        return Double(ipAddress.split(separator: ".").first ?? "0")
+    }
+}
+
+private actor MeasurementConcurrencyTracker {
+    private var activeCount = 0
+    private var peakActiveCount = 0
+
+    func measurementStarted() {
+        activeCount += 1
+        peakActiveCount = max(peakActiveCount, activeCount)
+    }
+
+    func measurementFinished() {
+        activeCount -= 1
+    }
+
+    func maxActiveCount() -> Int {
+        peakActiveCount
+    }
+}
+
+private actor EndpointSelectionTracker {
+    private var ipAddress: String?
+
+    func record(ipAddress: String) {
+        self.ipAddress = ipAddress
+    }
+
+    func lastIPAddress() -> String? {
+        ipAddress
+    }
+}
+
+private func makeLatencyTestRegion(id: String, name: String, ip: String) -> PIARegion {
+    PIARegion(
+        id: id,
+        name: name,
+        country: String(id.prefix(2)).uppercased(),
+        autoRegion: nil,
+        dns: "10.0.0.243",
+        portForward: nil,
+        geo: nil,
+        offline: nil,
+        servers: .init(
+            meta: [.init(ip: ip, cn: "\(id)-meta", van: nil)],
+            ovpntcp: [],
+            ovpnudp: [],
+            wg: [.init(ip: ip, cn: "\(id)-wg", van: nil)]
+        )
+    )
 }

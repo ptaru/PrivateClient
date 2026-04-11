@@ -14,6 +14,7 @@ final class AppModel: NSObject {
     var selectedTransport: VPNTransport = .wireGuard
     var sidebarSortMode: SidebarSortMode = .latency
     var regionLatenciesMs: [String: Double] = [:]
+    var isLatencyRefreshInProgress = false
     var connectedRegionID: String?
     var connectedTransport: VPNTransport?
     var sessionStatus: SessionStatus = .signedOut
@@ -22,6 +23,7 @@ final class AppModel: NSObject {
     var currentProfileID: Profile.ID?
     var isBootstrapped = false
     var isSignedIn = false
+    var isMainInterfaceReady = false
     var isExpectingDisconnect = false
 
     private let apiClient: PIAAPIClientProtocol
@@ -30,6 +32,7 @@ final class AppModel: NSObject {
     private let regionAutoSelector: RegionAutoSelecting
     private var regionLatenciesByTransport: [VPNTransport: [String: Double]] = [:]
     private var latencyRefreshTask: Task<Void, Never>?
+    private var latencyRefreshGeneration = 0
 
     init(
         apiClient: PIAAPIClientProtocol = PIAAPIClient(),
@@ -101,6 +104,7 @@ final class AppModel: NSObject {
             return
         }
         defer { isBootstrapped = true }
+        isMainInterfaceReady = false
 
         do {
             if let credentials = try credentialStore.loadCredentials() {
@@ -109,15 +113,19 @@ final class AppModel: NSObject {
                 isSignedIn = true
                 sessionStatus = .loadingServers
                 try await loadRegions()
+                await awaitLatencyRefreshCompletion()
                 sessionStatus = .ready
+                isMainInterfaceReady = true
                 appendLog("Restored saved credentials for \(credentials.username).")
             } else {
                 sessionStatus = .signedOut
+                isMainInterfaceReady = false
             }
         } catch {
             let message = error.presentableDescription
             sessionStatus = .failed(message)
             errorMessage = message
+            isMainInterfaceReady = false
             appendLog("Bootstrap failed: \(message)")
         }
     }
@@ -135,12 +143,17 @@ final class AppModel: NSObject {
             let token = try await apiClient.authenticate(username: username, password: password)
             try credentialStore.saveCredentials(.init(username: username, password: password))
             try credentialStore.saveToken(token)
-            try await loadRegions()
             isSignedIn = true
+            isMainInterfaceReady = false
+            sessionStatus = .loadingServers
+            try await loadRegions()
+            await awaitLatencyRefreshCompletion()
             sessionStatus = .ready
+            isMainInterfaceReady = true
             appendLog("Signed in and fetched \(regions.count) regions.")
         } catch {
             isSignedIn = false
+            isMainInterfaceReady = false
             let message = error.presentableDescription
             sessionStatus = .failed(message)
             errorMessage = message
@@ -151,6 +164,7 @@ final class AppModel: NSObject {
     func signOut(using tunnel: TunnelObservable) async {
         latencyRefreshTask?.cancel()
         latencyRefreshTask = nil
+        isLatencyRefreshInProgress = false
         if let currentProfileID {
             isExpectingDisconnect = true
             do {
@@ -177,6 +191,7 @@ final class AppModel: NSObject {
         errorMessage = nil
         logLines = []
         isSignedIn = false
+        isMainInterfaceReady = false
         sessionStatus = .signedOut
         isExpectingDisconnect = false
     }
@@ -208,7 +223,7 @@ final class AppModel: NSObject {
         }
 
         if sessionStatus == .connected {
-            appendLog("Switching servers. Disconnecting from current session...")
+            appendLog("Switching servers. Disconnecting from current session…")
             isExpectingDisconnect = true
             await disconnect(using: tunnel)
             // Wait a moment for the system to settle
@@ -349,6 +364,7 @@ final class AppModel: NSObject {
         guard !regions.isEmpty else {
             latencyRefreshTask?.cancel()
             latencyRefreshTask = nil
+            isLatencyRefreshInProgress = false
             regionLatenciesMs = [:]
             return
         }
@@ -363,7 +379,8 @@ final class AppModel: NSObject {
         startLatencyRefresh(
             for: transport,
             regionsSnapshot: regions,
-            autoSelectIfCurrentSelection: nil
+            autoSelectIfCurrentSelection: nil,
+            shouldAutoSelectWhenRefreshCompletes: false
         )
     }
 
@@ -380,6 +397,12 @@ final class AppModel: NSObject {
 
     func latencyValue(for selectionID: String) -> Double? {
         regionLatenciesMs[selectionID]
+    }
+
+    func awaitLatencyRefreshCompletion() async {
+        if let task = latencyRefreshTask {
+            await task.value
+        }
     }
 }
 
@@ -473,35 +496,31 @@ private extension AppModel {
         let cached = cachedLatencies(for: transport, regions: self.regions)
         regionLatenciesMs = cached ?? [:]
 
-        // Only set a default if we don't have a selection, or if the selection is no longer valid.
         let fallbackSelectionID: String?
+        let shouldAutoSelectWhenRefreshCompletes: Bool
         if selectedRegionID == nil {
-            if let fastestRegionID = regionLatenciesMs.min(by: { $0.value < $1.value })?.key {
-                selectedRegionID = fastestRegionID
-                if let region = self.regions.first(where: { $0.selectionID == fastestRegionID }) {
-                    appendLog("Auto-selected lowest latency region: \(region.name).")
-                }
-            }
-
-            if selectedRegionID == nil {
-                selectedRegionID = self.regions.first?.selectionID
-            }
-            fallbackSelectionID = selectedRegionID
-        } else if !self.regions.contains(where: { $0.selectionID == selectedRegionID }) {
-            // Check if it's the connected region, if so keep it even if not in current list (rare).
-            if sessionStatus != .connected {
-                selectedRegionID = regionLatenciesMs.min(by: { $0.value < $1.value })?.key
-                    ?? self.regions.first?.selectionID
-            }
-            fallbackSelectionID = selectedRegionID
-        } else {
             fallbackSelectionID = nil
+            shouldAutoSelectWhenRefreshCompletes = true
+        } else if !self.regions.contains(where: { $0.selectionID == selectedRegionID }) {
+            // Keep the connected region selection if it temporarily disappears from the list.
+            if sessionStatus == .connected {
+                fallbackSelectionID = selectedRegionID
+                shouldAutoSelectWhenRefreshCompletes = false
+            } else {
+                selectedRegionID = nil
+                fallbackSelectionID = nil
+                shouldAutoSelectWhenRefreshCompletes = true
+            }
+        } else {
+            fallbackSelectionID = selectedRegionID
+            shouldAutoSelectWhenRefreshCompletes = false
         }
 
         startLatencyRefresh(
             for: transport,
             regionsSnapshot: self.regions,
-            autoSelectIfCurrentSelection: fallbackSelectionID
+            autoSelectIfCurrentSelection: fallbackSelectionID,
+            shouldAutoSelectWhenRefreshCompletes: shouldAutoSelectWhenRefreshCompletes
         )
     }
 
@@ -519,19 +538,21 @@ private extension AppModel {
     func startLatencyRefresh(
         for transport: VPNTransport,
         regionsSnapshot: [PIARegion],
-        autoSelectIfCurrentSelection selectionID: String?
+        autoSelectIfCurrentSelection selectionID: String?,
+        shouldAutoSelectWhenRefreshCompletes shouldAutoSelect: Bool
     ) {
         latencyRefreshTask?.cancel()
+        latencyRefreshGeneration += 1
+        let generation = latencyRefreshGeneration
         guard !regionsSnapshot.isEmpty else {
+            isLatencyRefreshInProgress = false
             return
         }
+        isLatencyRefreshInProgress = true
 
         let selector = regionAutoSelector
         latencyRefreshTask = Task(priority: .utility) {
-            let measured = await selector.measureLatencies(
-                from: regionsSnapshot,
-                transport: transport
-            )
+            let measured = await selector.measureLatencies(from: regionsSnapshot, transport: transport)
             guard !Task.isCancelled else {
                 return
             }
@@ -540,13 +561,17 @@ private extension AppModel {
                 guard !Task.isCancelled else {
                     return
                 }
+                guard self.latencyRefreshGeneration == generation else {
+                    return
+                }
 
                 regionLatenciesByTransport[transport] = measured
                 if selectedTransport == transport {
                     regionLatenciesMs = measured
                 }
+                isLatencyRefreshInProgress = false
 
-                guard let selectionID else {
+                guard shouldAutoSelect else {
                     return
                 }
                 guard selectedRegionID == selectionID else {
@@ -640,7 +665,7 @@ private extension AppModel {
             guard error.isRecoverableFirstAuthorizationFailure else {
                 throw error
             }
-            appendLog("VPN permission changed. Waiting for system configuration to settle...")
+            appendLog("VPN permission changed. Waiting for system configuration to settle…")
             try await Task.sleep(for: .milliseconds(1200))
             try await tunnel.connect(to: profile, title: title)
         }

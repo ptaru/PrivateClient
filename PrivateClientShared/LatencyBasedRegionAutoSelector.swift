@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 protocol RegionAutoSelecting: Sendable {
     func selectRegionID(from regions: [PIARegion], transport: VPNTransport) async -> String?
@@ -15,9 +16,9 @@ struct LatencyBasedRegionAutoSelector: RegionAutoSelecting {
     let maxConcurrentMeasurements: Int
 
     init(
-        latencyMeasurer: EndpointLatencyMeasuring = ICMPPingLatencyMeasurer(),
+        latencyMeasurer: EndpointLatencyMeasuring = TCPConnectLatencyMeasurer(),
         timeoutMilliseconds: Int = 1000,
-        maxConcurrentMeasurements: Int = 256
+        maxConcurrentMeasurements: Int = 64
     ) {
         self.latencyMeasurer = latencyMeasurer
         self.timeoutMilliseconds = timeoutMilliseconds
@@ -31,6 +32,10 @@ struct LatencyBasedRegionAutoSelector: RegionAutoSelecting {
 
     func measureLatencies(from regions: [PIARegion], transport: VPNTransport) async -> [String: Double] {
         let candidates = regions.compactMap { region -> (String, String)? in
+            if let endpoint = region.servers.meta.first {
+                return (region.selectionID, endpoint.ip)
+            }
+
             guard let endpoint = region.servers.endpoint(for: transport) else {
                 return nil
             }
@@ -75,87 +80,167 @@ struct LatencyBasedRegionAutoSelector: RegionAutoSelecting {
             for (regionID, latency) in batchLatencies {
                 latencies[regionID] = latency
             }
+
         }
 
         return latencies
     }
 }
 
-struct ICMPPingLatencyMeasurer: EndpointLatencyMeasuring {
+struct TCPConnectLatencyMeasurer: EndpointLatencyMeasuring {
+    let port: UInt16
+
+    init(port: UInt16 = 443) {
+        self.port = port
+    }
+
     func measureLatency(to ipAddress: String, timeoutMilliseconds: Int) async -> Double? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                let latency = measureLatencySynchronously(
-                    to: ipAddress,
-                    timeoutMilliseconds: timeoutMilliseconds
-                )
-                continuation.resume(returning: latency)
+        let runner = TCPConnectionProbe(
+            host: NWEndpoint.Host(ipAddress),
+            port: NWEndpoint.Port(rawValue: port) ?? .https,
+            timeoutMilliseconds: timeoutMilliseconds
+        )
+
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                runner.start(continuation: continuation)
             }
+        } onCancel: {
+            runner.cancel()
         }
     }
+    
+    private final class TCPConnectionProbe: @unchecked Sendable {
+        private let host: NWEndpoint.Host
+        private let port: NWEndpoint.Port
+        private let timeoutMilliseconds: Int
+        private let lock = NSLock()
+        private let queue = DispatchQueue(
+            label: "uk.tarun.PrivateClient.latency-probe",
+            qos: .utility
+        )
 
-    private func measureLatencySynchronously(to ipAddress: String, timeoutMilliseconds: Int) -> Double? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/sbin/ping")
-        process.arguments = [
-            "-c", "1",
-            "-n",
-            "-q",
-            "-W", String(timeoutMilliseconds),
-            ipAddress
-        ]
+        private var continuation: CheckedContinuation<Double?, Never>?
+        private var connection: NWConnection?
+        private var timeoutWorkItem: DispatchWorkItem?
+        private var didResume = false
+        private var isCancelled = false
+        private var startTime: DispatchTime?
 
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.standardOutput = stdout
-        process.standardError = stderr
-
-        do {
-            try process.run()
-        } catch {
-            return nil
+        init(host: NWEndpoint.Host, port: NWEndpoint.Port, timeoutMilliseconds: Int) {
+            self.host = host
+            self.port = port
+            self.timeoutMilliseconds = timeoutMilliseconds
         }
 
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            return nil
-        }
-
-        let output = String(
-            data: stdout.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        let errorOutput = String(
-            data: stderr.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-
-        return Self.parseLatency(from: output + "\n" + errorOutput)
-    }
-
-    static func parseLatency(from output: String) -> Double? {
-        let patterns = [
-            #"time=([0-9]+(?:\.[0-9]+)?)"#,
-            #"min/avg/max(?:/stddev)? = [0-9]+(?:\.[0-9]+)?/([0-9]+(?:\.[0-9]+)?)/"#
-        ]
-
-        for pattern in patterns {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else {
-                continue
+        func start(continuation: CheckedContinuation<Double?, Never>) {
+            let connection = NWConnection(host: host, port: port, using: .tcp)
+            connection.stateUpdateHandler = { [weak self] state in
+                self?.handle(state: state)
             }
 
-            let range = NSRange(output.startIndex..<output.endIndex, in: output)
-            guard let match = regex.firstMatch(in: output, range: range),
-                  match.numberOfRanges > 1,
-                  let latencyRange = Range(match.range(at: 1), in: output) else {
-                continue
+            lock.lock()
+            if isCancelled || didResume {
+                didResume = true
+                lock.unlock()
+                continuation.resume(returning: nil)
+                return
             }
 
-            return Double(output[latencyRange])
+            self.continuation = continuation
+            self.connection = connection
+            self.startTime = .now()
+            let timeoutWorkItem = DispatchWorkItem { [weak self] in
+                self?.finish(with: nil)
+                connection.cancel()
+            }
+            self.timeoutWorkItem = timeoutWorkItem
+            lock.unlock()
+
+            queue.asyncAfter(
+                deadline: .now() + .milliseconds(timeoutMilliseconds),
+                execute: timeoutWorkItem
+            )
+            connection.start(queue: queue)
         }
 
-        return nil
+        func cancel() {
+            let connection: NWConnection?
+            let timeoutWorkItem: DispatchWorkItem?
+            let continuation: CheckedContinuation<Double?, Never>?
+
+            lock.lock()
+            isCancelled = true
+            connection = self.connection
+            timeoutWorkItem = self.timeoutWorkItem
+            if didResume {
+                continuation = nil
+            } else {
+                didResume = true
+                continuation = self.continuation
+                clearStateLocked()
+            }
+            lock.unlock()
+
+            timeoutWorkItem?.cancel()
+            connection?.cancel()
+            continuation?.resume(returning: nil)
+        }
+
+        private func handle(state: NWConnection.State) {
+            switch state {
+            case .ready:
+                let latency = latencyMilliseconds()
+                finish(with: latency)
+                connection?.cancel()
+            case .failed, .cancelled:
+                finish(with: nil)
+            case .setup, .preparing, .waiting:
+                break
+            @unknown default:
+                finish(with: nil)
+            }
+        }
+
+        private func finish(with latency: Double?) {
+            let timeoutWorkItem: DispatchWorkItem?
+            let continuation: CheckedContinuation<Double?, Never>?
+
+            lock.lock()
+            guard !didResume else {
+                lock.unlock()
+                return
+            }
+
+            didResume = true
+            timeoutWorkItem = self.timeoutWorkItem
+            continuation = self.continuation
+            clearStateLocked()
+            lock.unlock()
+
+            timeoutWorkItem?.cancel()
+            continuation?.resume(returning: latency)
+        }
+
+        private func latencyMilliseconds() -> Double? {
+            lock.lock()
+            let startTime = self.startTime
+            lock.unlock()
+
+            guard let startTime else {
+                return nil
+            }
+
+            let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - startTime.uptimeNanoseconds
+            return Double(elapsedNanoseconds) / 1_000_000
+        }
+
+        private func clearStateLocked() {
+            continuation = nil
+            connection = nil
+            timeoutWorkItem = nil
+            startTime = nil
+        }
     }
 }
 
