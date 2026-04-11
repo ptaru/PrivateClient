@@ -15,6 +15,7 @@
 		414E253061E9B194CDFE4E1F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1317A04828FE24E33DF2D9 /* AppModel.swift */; };
 		4B60E22301FC971C3A09B91F /* AppSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62355CA84880C5E9FC862E97 /* AppSupport.swift */; };
 		58AAE1E7C78270D3D323906E /* PrivateClientTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3986B76B8BC8E225AC09FAB2 /* PrivateClientTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		58FC55EC2F8A401500F01754 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 58FC55EB2F8A401500F01754 /* AppIcon.icon */; };
 		62D412FEE00F0BD83F310895 /* PIAModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB92151938BFED294644D96 /* PIAModels.swift */; };
 		78BD2182399C82A2C2C993A9 /* PIAAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D55C26B6AEBD6D4DB6D910A /* PIAAPIClient.swift */; };
 		9A227133941C875873B68442 /* ca.rsa.4096.crt in Resources */ = {isa = PBXBuildFile; fileRef = AF05B34226FA33E6747AA86F /* ca.rsa.4096.crt */; };
@@ -70,6 +71,7 @@
 		3986B76B8BC8E225AC09FAB2 /* PrivateClientTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PrivateClientTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		3DDB1A85BD3049BE04493582 /* PrivateClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateClientTests.swift; sourceTree = "<group>"; };
 		425F84250481990A7072D8D2 /* PIAProfileBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PIAProfileBuilder.swift; sourceTree = "<group>"; };
+		58FC55EB2F8A401500F01754 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		62355CA84880C5E9FC862E97 /* AppSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSupport.swift; sourceTree = "<group>"; };
 		77A9107B8EA229390FCF7611 /* PrivateClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateClientApp.swift; sourceTree = "<group>"; };
 		7A441A3CEFA601503F9492EF /* Tunnel.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Tunnel.plist; sourceTree = "<group>"; };
@@ -153,6 +155,7 @@
 				D277AC09B2893D4A64E8C58C /* ContentView.swift */,
 				77A9107B8EA229390FCF7611 /* PrivateClientApp.swift */,
 				AC8D7FB9E432A1B1F73EFDA5 /* Resources */,
+				58FC55EB2F8A401500F01754 /* AppIcon.icon */,
 			);
 			path = PrivateClient;
 			sourceTree = "<group>";
@@ -308,6 +311,7 @@
 			files = (
 				F9B9BBE1E1ED3B252BEC5635 /* Assets.xcassets in Resources */,
 				9A227133941C875873B68442 /* ca.rsa.4096.crt in Resources */,
+				58FC55EC2F8A401500F01754 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

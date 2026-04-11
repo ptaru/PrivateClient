@@ -2,11 +2,10 @@ import Partout
 import SwiftUI
 
 struct ContentView: View {
-    @State
-    private var model = AppModel()
+    @Bindable
+    var model: AppModel
 
-    @State
-    private var tunnel = TunnelObservable.shared
+    var tunnel: TunnelObservable
 
     @State
     private var connectedSince: Date?
@@ -16,6 +15,9 @@ struct ContentView: View {
 
     @State
     private var isLogVisible = false
+
+    @State
+    private var columnVisibility: NavigationSplitViewVisibility = .automatic
 
     private let refreshTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
     private let clockTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
@@ -131,24 +133,13 @@ private extension ContentView {
     }
 
     var mainView: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             serverListPane
                 .navigationSplitViewColumnWidth(ideal: 300, max: 400)
                 .navigationTitle("Servers")
-                .safeAreaInset(edge: .bottom) {
+                .safeAreaBar(edge: .bottom) {
                     if let connectedRegion = model.connectedRegion {
                         sidebarStatusCard(for: connectedRegion)
-                    }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            Task { await model.refreshRegions() }
-                        } label: {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                        .disabled(model.isBusy)
-                        .help("Refresh Regions")
                     }
                 }
         } detail: {
@@ -156,11 +147,11 @@ private extension ContentView {
                 .navigationSplitViewColumnWidth(ideal: 600)
                 .navigationTitle(model.selectedRegion?.name ?? "Connection")
                 .toolbar {
-                    ToolbarItem(placement: .navigation) {
-                        statusBadge
-                    }
-                    
                     ToolbarItemGroup(placement: .primaryAction) {
+                        if columnVisibility == .detailOnly {
+                            statusBadge
+                        }
+
                         Button {
                             isLogVisible.toggle()
                         } label: {
@@ -223,9 +214,6 @@ private extension ContentView {
         .padding(12)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .padding(8)
-        .overlay(alignment: .top) {
-            Divider()
-        }
     }
 
     var serverListPane: some View {
