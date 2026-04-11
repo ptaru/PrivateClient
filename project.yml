@@ -83,6 +83,10 @@ targets:
       - path: PrivateClientShared
     info:
       path: PrivateClientTunnel/Tunnel.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
     entitlements:
       path: PrivateClientTunnel/Tunnel.entitlements
       properties:
