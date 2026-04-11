@@ -24,6 +24,12 @@ struct ContentView: View {
     private var isStatusPopoverVisible = false
 
     @State
+    private var expandedCountries: Set<String> = []
+
+    @State
+    private var pendingSidebarScrollSelectionID: String?
+
+    @State
     private var mapPosition = MapCameraPosition.region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
@@ -65,6 +71,9 @@ struct ContentView: View {
                     } else {
                         connectedSince = nil
                     }
+                }
+                .onAppear {
+                    expandSelectionGroupIfNeeded()
                 }
         }
     }
@@ -235,6 +244,9 @@ private extension ContentView {
                     Text(region.name)
                         .font(.headline)
                         .lineLimit(1)
+                    Text(region.flagDisplay)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image(systemName: "shield.checkered")
@@ -289,48 +301,63 @@ private extension ContentView {
     var serverListPane: some View {
         ScrollViewReader { proxy in
             List(selection: $model.selectedRegionID) {
-                ForEach(model.filteredRegions, id: \.selectionID) { region in
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(region.name)
-                                .font(.headline)
-                            Text(region.country)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        HStack(spacing: 6) {
-                            if region.geo == true {
-                                Image(systemName: "globe")
-                                    .help("Geographic location")
+                ForEach(groupedRegions) { group in
+                    if group.isCollapsible {
+                        DisclosureGroup(
+                            isExpanded: Binding(
+                                get: { isCountryExpanded(group.countryCode) },
+                                set: { isExpanded in
+                                    if isExpanded {
+                                        expandedCountries.insert(group.countryCode)
+                                    } else {
+                                        expandedCountries.remove(group.countryCode)
+                                    }
+                                }
+                            )
+                        ) {
+                            ForEach(group.regions, id: \.selectionID) { region in
+                                groupedRegionRow(region)
                             }
-                            if region.portForward == true {
-                                Image(systemName: "arrow.up.right.square")
-                                    .help("Port Forwarding available")
+                        } label: {
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(group.countryName)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(group.flagDisplay)
+                                        .font(.headline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text("\(group.regions.count)")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.top, 2)
                             }
                         }
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    } else if let region = group.regions.first {
+                        singleRegionCountryRow(region, countryName: group.countryName)
                     }
-                    .padding(.vertical, 6)
-                    .tag(region.selectionID)
-                    .id(region.selectionID)
                 }
             }
             .onChange(of: model.selectedRegionID) { _, newSelection in
                 guard let newSelection else {
                     return
                 }
+                expandSelectionGroupIfNeeded()
+                guard pendingSidebarScrollSelectionID == newSelection else {
+                    return
+                }
+
+                pendingSidebarScrollSelectionID = nil
                 withAnimation(.easeInOut(duration: 0.25)) {
                     proxy.scrollTo(newSelection, anchor: .center)
                 }
-                DispatchQueue.main.async {
-                    proxy.scrollTo(newSelection, anchor: .center)
-                }
+            }
+            .onChange(of: model.searchText) { _, _ in
+                expandSelectionGroupIfNeeded()
             }
             .onAppear {
+                expandSelectionGroupIfNeeded()
                 guard let selected = model.selectedRegionID else {
                     return
                 }
@@ -410,6 +437,7 @@ private extension ContentView {
                     .contentShape(Rectangle())
                     .shadow(radius: mapRegion.region.selectionID == model.selectedRegionID ? 4 : 2)
                     .onTapGesture {
+                        pendingSidebarScrollSelectionID = mapRegion.region.selectionID
                         model.selectedRegionID = mapRegion.region.selectionID
                     }
                 }
@@ -434,7 +462,7 @@ private extension ContentView {
 
             HStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(region.country.uppercased())
+                    Text(region.flagDisplay)
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                     
@@ -504,7 +532,7 @@ private extension ContentView {
                     Text(region.name)
                         .font(.system(size: 36, weight: .bold, design: .rounded))
                     
-                    Text(region.country)
+                    Text(region.flagDisplay)
                         .font(.title2)
                         .foregroundStyle(.secondary)
                 }
@@ -710,4 +738,171 @@ private extension ContentView {
         return value
     }
 
+    func groupedRegionRow(_ region: PIARegion) -> some View {
+        HStack(spacing: 12) {
+            Text(region.name)
+                .font(.headline)
+                .lineLimit(1)
+
+            Spacer()
+
+            HStack(spacing: 6) {
+                if region.geo == true {
+                    Image(systemName: "globe")
+                        .help("Geographic location")
+                }
+                if region.portForward == true {
+                    Image(systemName: "arrow.up.right.square")
+                        .help("Port Forwarding available")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 6)
+        .tag(region.selectionID)
+        .id(region.selectionID)
+    }
+
+    func singleRegionCountryRow(_ region: PIARegion, countryName: String) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(countryName)
+                    .font(.subheadline.weight(.semibold))
+                Text(region.flagDisplay)
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            HStack(spacing: 6) {
+                if region.geo == true {
+                    Image(systemName: "globe")
+                        .help("Geographic location")
+                }
+                if region.portForward == true {
+                    Image(systemName: "arrow.up.right.square")
+                        .help("Port Forwarding available")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 6)
+        .tag(region.selectionID)
+        .id(region.selectionID)
+    }
+
+    var groupedRegions: [CountryRegionGroup] {
+        let grouped = Dictionary(grouping: model.filteredRegions, by: \.country)
+        return grouped
+            .map { countryCode, regions in
+                CountryRegionGroup(
+                    countryCode: countryCode,
+                    regions: regions.sorted {
+                        $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                    }
+                )
+            }
+            .sorted {
+                $0.countryCode.localizedCaseInsensitiveCompare($1.countryCode) == .orderedAscending
+            }
+    }
+
+    var selectedCountryCode: String? {
+        model.selectedRegion?.country
+    }
+
+    func isCountryExpanded(_ countryCode: String) -> Bool {
+        let normalizedCode = countryCode.uppercased()
+        if !model.searchText.isEmpty {
+            return true
+        }
+        return expandedCountries.contains(normalizedCode) || selectedCountryCode?.uppercased() == normalizedCode
+    }
+
+    func expandSelectionGroupIfNeeded() {
+        guard let selectedCountryCode else {
+            return
+        }
+        expandedCountries.insert(selectedCountryCode.uppercased())
+    }
+
+}
+
+private extension PIARegion {
+    var flagDisplay: String {
+        let trimmedCode = country.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard trimmedCode.count == 2 else {
+            return country
+        }
+
+        let scalars = trimmedCode.unicodeScalars.compactMap { scalar -> UnicodeScalar? in
+            let value = scalar.value
+            guard (65...90).contains(value) else {
+                return nil
+            }
+            return UnicodeScalar(127397 + Int(value))
+        }
+
+        guard scalars.count == 2 else {
+            return country
+        }
+
+        return String(String.UnicodeScalarView(scalars))
+    }
+}
+
+private struct CountryRegionGroup: Identifiable {
+    let countryCode: String
+    let regions: [PIARegion]
+
+    var id: String {
+        countryCode.uppercased()
+    }
+
+    var isCollapsible: Bool {
+        regions.count > 1
+    }
+
+    var countryName: String {
+        countryCode.countryNameFromCode
+    }
+
+    var flagDisplay: String {
+        countryCode.flagFromCountryCode
+    }
+}
+
+private extension String {
+    var flagFromCountryCode: String {
+        let trimmedCode = trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard trimmedCode.count == 2 else {
+            return self
+        }
+
+        let scalars = trimmedCode.unicodeScalars.compactMap { scalar -> UnicodeScalar? in
+            let value = scalar.value
+            guard (65...90).contains(value) else {
+                return nil
+            }
+            return UnicodeScalar(127397 + Int(value))
+        }
+
+        guard scalars.count == 2 else {
+            return self
+        }
+
+        return String(String.UnicodeScalarView(scalars))
+    }
+
+    var countryNameFromCode: String {
+        let trimmedCode = trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard trimmedCode.count == 2 else {
+            return self
+        }
+
+        return Locale.current.localizedString(forRegionCode: trimmedCode) ?? self
+    }
 }
