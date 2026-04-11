@@ -226,13 +226,9 @@ private extension ContentView {
             .tint(.red)
             .controlSize(.small)
         }
-        .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(.white.opacity(0.1), lineWidth: 0.5)
-        )
-        .padding(12)
+        .padding(14)
+        .glassEffect(in: .rect(cornerRadius: 18))
+        .padding(10)
     }
 
     var serverListPane: some View {
@@ -414,13 +410,8 @@ private extension ContentView {
                 .disabled((!model.canConnect && !isActuallyConnected) || isBusy)
             }
         }
-        .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(.white.opacity(0.1), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+        .padding(20)
+        .glassEffect(in: .rect(cornerRadius: 24))
     }
 
     func statusCard(for region: PIARegion) -> some View {
