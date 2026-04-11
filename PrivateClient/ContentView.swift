@@ -195,6 +195,22 @@ private extension ContentView {
             logPane
                 .inspectorColumnWidth(min: 300, ideal: 350, max: 500)
         }
+        .onChange(of: model.selectedRegionID) { _, newValue in
+            guard let newValue,
+                  let region = model.regions.first(where: { $0.selectionID == newValue }),
+                  let coordinate = RegionCoordinateResolver.coordinate(for: region) else {
+                return
+            }
+
+            withAnimation(.spring(duration: 0.6)) {
+                mapPosition = .region(
+                    MKCoordinateRegion(
+                        center: coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 20, longitudeDelta: 20)
+                    )
+                )
+            }
+        }
     }
 
     func sidebarStatusCard(for region: PIARegion) -> some View {
@@ -400,7 +416,6 @@ private extension ContentView {
             }
         }
         .mapStyle(.standard(elevation: .automatic))
-        .ignoresSafeArea(.container, edges: .all)
     }
 
     func compactConnectionPanel(for region: PIARegion) -> some View {
