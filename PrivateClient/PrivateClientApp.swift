@@ -1,5 +1,6 @@
 import SwiftUI
 import Partout
+import AppKit
 
 @main
 struct PrivateClientApp: App {
@@ -53,6 +54,37 @@ struct PrivateClientApp: App {
                     Label("Sort Servers", systemImage: "arrow.up.arrow.down")
                 }
             }
+        }
+
+        MenuBarExtra {
+            Text("Status: \(model.sessionStatus.label)")
+            if model.sessionStatus == .connected {
+                Text("Location: \(model.connectedRegion?.displayName ?? "Unknown")")
+                Text("Protocol: \(model.connectedTransport?.displayName ?? "Unknown")")
+            }
+            Divider()
+            if model.sessionStatus == .connected {
+                Button("Disconnect", role: .destructive) {
+                    Task { await model.disconnect(using: tunnel) }
+                }
+                .disabled(model.isBusy)
+            } else {
+                Button("Quick Connect") {
+                    Task { await model.quickConnect(using: tunnel) }
+                }
+                .disabled(!model.isAuthenticated || model.isBusy || model.regions.isEmpty)
+            }
+            Divider()
+            Button("Open PrivateClient") {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.windows.first?.makeKeyAndOrderFront(nil)
+            }
+            Button("Quit PrivateClient") {
+                NSApp.terminate(nil)
+            }
+        } label: {
+            Image(model.sessionStatus == .connected ? "menubar-connected" : "menubar-disconnected")
+                .renderingMode(.template)
         }
     }
 }

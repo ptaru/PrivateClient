@@ -832,13 +832,10 @@ private extension ContentView {
 
             HStack(spacing: 6) {
                 if region.geo == true {
-                    Image(systemName: "globe")
-                        .help("Geographic location")
+                    Image(systemName: "mappin.slash.circle")
+                        .help("You will appear to be in this location, even if the server is elsewhere")
                 }
-                if region.portForward == true {
-                    Image(systemName: "arrow.up.right.square")
-                        .help("Port Forwarding available")
-                }
+                // Hidden until full port-forwarding support is implemented.
                 if let latency = model.latencyText(for: region) {
                     Text(latency)
                         .font(.system(size: 10, design: .monospaced))
@@ -866,13 +863,10 @@ private extension ContentView {
 
             HStack(spacing: 6) {
                 if region.geo == true {
-                    Image(systemName: "globe")
-                        .help("Geographic location")
+                    Image(systemName: "mappin.slash.circle")
+                        .help("You will appear to be in this location, even if the server is elsewhere")
                 }
-                if region.portForward == true {
-                    Image(systemName: "arrow.up.right.square")
-                        .help("Port Forwarding available")
-                }
+                // Hidden until full port-forwarding support is implemented.
                 if let latency = model.latencyText(for: region) {
                     Text(latency)
                         .font(.system(size: 10, design: .monospaced))

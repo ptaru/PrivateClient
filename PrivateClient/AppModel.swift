@@ -17,6 +17,7 @@ final class AppModel: NSObject {
     var isLatencyRefreshInProgress = false
     var connectedRegionID: String?
     var connectedTransport: VPNTransport?
+    var connectedSince: Date?
     var sessionStatus: SessionStatus = .signedOut
     var errorMessage: String?
     var logLines: [String] = []
@@ -97,6 +98,10 @@ final class AppModel: NSObject {
         case .signedOut, .ready, .connected, .failed:
             return false
         }
+    }
+
+    var connectionDurationLabel: String {
+        connectionDurationLabel(referenceDate: Date())
     }
 
     func bootstrap() async {
@@ -184,6 +189,7 @@ final class AppModel: NSObject {
         currentProfileID = nil
         connectedRegionID = nil
         connectedTransport = nil
+        connectedSince = nil
         regions = []
         regionLatenciesMs = [:]
         regionLatenciesByTransport = [:]
@@ -279,6 +285,7 @@ final class AppModel: NSObject {
 
             connectedRegionID = region.selectionID
             connectedTransport = selectedTransport
+            connectedSince = Date()
             sessionStatus = .connected
             isExpectingDisconnect = false
             appendLog("Connected to \(region.name) using \(selectedTransport.displayName).")
@@ -305,6 +312,7 @@ final class AppModel: NSObject {
             self.currentProfileID = nil
             connectedRegionID = nil
             connectedTransport = nil
+            connectedSince = nil
             sessionStatus = .ready
             isExpectingDisconnect = false
             appendLog("Disconnected from VPN.")
@@ -325,6 +333,7 @@ final class AppModel: NSObject {
             currentProfileID = nil
             connectedRegionID = nil
             connectedTransport = nil
+            connectedSince = nil
             if isAuthenticated, !isBusy {
                 if !isExpectingDisconnect, previousStatus == .connected || previousStatus == .connecting {
                     let message = "VPN disconnected unexpectedly. Check extension permissions and Network Extension configuration."
@@ -347,6 +356,9 @@ final class AppModel: NSObject {
         case .active:
             if sessionStatus != .connected {
                 sessionStatus = .connected
+            }
+            if connectedSince == nil {
+                connectedSince = Date()
             }
             isExpectingDisconnect = false
         }
@@ -403,6 +415,53 @@ final class AppModel: NSObject {
         if let task = latencyRefreshTask {
             await task.value
         }
+    }
+
+    func connectionDurationLabel(referenceDate: Date) -> String {
+        guard let connectedSince else {
+            return "00:00"
+        }
+        let elapsed = max(0, Int(referenceDate.timeIntervalSince(connectedSince)))
+        let hours = elapsed / 3600
+        let minutes = (elapsed % 3600) / 60
+        let seconds = elapsed % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    func quickConnect(using tunnel: TunnelObservable) async {
+        guard isAuthenticated else {
+            errorMessage = "Sign in to connect."
+            return
+        }
+        guard !isBusy else {
+            return
+        }
+        guard !regions.isEmpty else {
+            errorMessage = "No server regions available yet."
+            return
+        }
+
+        if regionLatenciesMs.isEmpty {
+            refreshLatencyMeasurements()
+            await awaitLatencyRefreshCompletion()
+        }
+
+        if let fastestSelectionID = lowestLatencySelectionID() {
+            if fastestSelectionID != selectedRegionID {
+                selectedRegionID = fastestSelectionID
+                if let region = selectedRegion {
+                    appendLog("Quick Connect selected \(region.name) based on lowest latency.")
+                }
+            }
+        } else if selectedRegionID == nil, let fallbackRegion = regions.first {
+            selectedRegionID = fallbackRegion.selectionID
+            appendLog("Quick Connect selected \(fallbackRegion.name) (latency unavailable).")
+        }
+
+        await connect(using: tunnel)
     }
 }
 
@@ -485,6 +544,14 @@ private extension NSError {
 }
 
 private extension AppModel {
+    func lowestLatencySelectionID() -> String? {
+        let validSelectionIDs = Set(regions.map(\.selectionID))
+        return regionLatenciesMs
+            .filter { validSelectionIDs.contains($0.key) }
+            .min(by: { $0.value < $1.value })?
+            .key
+    }
+
     static var certificateURL: URL {
         Bundle.main.url(forResource: "ca.rsa.4096", withExtension: "crt")!
     }
