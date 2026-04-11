@@ -45,6 +45,13 @@ final class AppModel {
         return regions.first(where: { $0.id == selectedRegionID })
     }
 
+    var connectedRegion: PIARegion? {
+        guard sessionStatus == .connected else {
+            return nil
+        }
+        return selectedRegion
+    }
+
     var filteredRegions: [PIARegion] {
         guard !searchText.isEmpty else {
             return regions

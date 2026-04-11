@@ -135,6 +135,11 @@ private extension ContentView {
             serverListPane
                 .navigationSplitViewColumnWidth(ideal: 300, max: 400)
                 .navigationTitle("Servers")
+                .safeAreaInset(edge: .bottom) {
+                    if let connectedRegion = model.connectedRegion {
+                        sidebarStatusCard(for: connectedRegion)
+                    }
+                }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
@@ -177,6 +182,49 @@ private extension ContentView {
         .inspector(isPresented: $isLogVisible) {
             logPane
                 .inspectorColumnWidth(min: 300, ideal: 350, max: 500)
+        }
+    }
+
+    func sidebarStatusCard(for region: PIARegion) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CONNECTED")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(.green)
+                    Text(region.name)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "shield.checkered")
+                    .font(.title2)
+                    .foregroundStyle(.green.gradient)
+            }
+            
+            HStack {
+                Label(connectionDurationLabel, systemImage: "clock")
+                Spacer()
+                Text(model.selectedTransport.displayName)
+            }
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(.secondary)
+            
+            Button(role: .destructive) {
+                Task { await model.disconnect(using: tunnel) }
+            } label: {
+                Text("Disconnect")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .controlSize(.small)
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(8)
+        .overlay(alignment: .top) {
+            Divider()
         }
     }
 
