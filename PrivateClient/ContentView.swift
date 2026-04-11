@@ -241,7 +241,7 @@ private extension ContentView {
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.green)
                     }
-                    Text(region.name)
+                    Text(region.displayName)
                         .font(.headline)
                         .lineLimit(1)
                     Text(region.flagDisplay)
@@ -445,7 +445,7 @@ private extension ContentView {
     var mapPane: some View {
         Map(position: $mapPosition) {
             ForEach(mapRegions) { mapRegion in
-                Annotation(mapRegion.region.name, coordinate: mapRegion.coordinate) {
+                Annotation(mapRegion.region.displayName, coordinate: mapRegion.coordinate) {
                     ZStack {
                         Image(systemName: mapRegion.region.selectionID == model.selectedRegionID ? "shield.fill" : "shield")
                             .font(.system(size: mapRegion.region.selectionID == model.selectedRegionID ? 24 : 16, weight: .semibold))
@@ -483,7 +483,7 @@ private extension ContentView {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.secondary)
                     
-                    Text(region.name)
+                    Text(region.displayName)
                         .font(.headline)
                         .lineLimit(1)
                     
@@ -546,7 +546,7 @@ private extension ContentView {
                         .foregroundStyle(isActuallyConnected ? .green : .secondary)
                         .textCase(.uppercase)
                     
-                    Text(region.name)
+                    Text(region.displayName)
                         .font(.system(size: 36, weight: .bold, design: .rounded))
                     
                     Text(region.flagDisplay)
@@ -757,7 +757,7 @@ private extension ContentView {
 
     func groupedRegionRow(_ region: PIARegion) -> some View {
         HStack(spacing: 12) {
-            Text(region.name)
+            Text(region.displayName)
                 .font(.headline)
                 .lineLimit(1)
 

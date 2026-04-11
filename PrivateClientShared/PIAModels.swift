@@ -119,6 +119,22 @@ struct PIARegion: Codable, Hashable, Identifiable, Sendable {
             dns ?? ""
         ].joined(separator: "::")
     }
+
+    var displayName: String {
+        guard !name.localizedCaseInsensitiveContains("Streaming") else {
+            return name
+        }
+
+        let components = name.components(separatedBy: " ")
+        if components.count > 1,
+           let first = components.first,
+           first.count == 2,
+           first == first.uppercased(),
+           first.rangeOfCharacter(from: CharacterSet.letters.inverted) == nil {
+            return components.dropFirst().joined(separator: " ")
+        }
+        return name
+    }
 }
 
 struct PIAAuthToken: Codable, Equatable, Sendable {
