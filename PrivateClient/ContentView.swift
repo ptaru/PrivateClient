@@ -14,244 +14,387 @@ struct ContentView: View {
     @State
     private var timerNow = Date()
 
+    @State
+    private var isLogVisible = false
+
     private let refreshTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
     private let clockTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        Group {
-            if !model.isSignedIn {
-                loginView
-            } else {
-                mainView
-            }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task {
-            await model.synchronize(with: tunnel)
-        }
-        .onReceive(refreshTimer) { _ in
-            Task {
-                await model.synchronize(with: tunnel)
-            }
-        }
-        .onReceive(clockTimer) { now in
-            timerNow = now
-        }
-        .onChange(of: model.sessionStatus) { _, newStatus in
-            if newStatus == .connected {
-                if connectedSince == nil {
-                    connectedSince = Date()
+        if !model.isSignedIn {
+            loginView
+                .task {
+                    await model.synchronize(with: tunnel)
                 }
-            } else {
-                connectedSince = nil
-            }
+                .onReceive(refreshTimer) { _ in
+                    Task { await model.synchronize(with: tunnel) }
+                }
+                .onReceive(clockTimer) { now in
+                    timerNow = now
+                }
+        } else {
+            mainView
+                .task {
+                    await model.synchronize(with: tunnel)
+                }
+                .onReceive(refreshTimer) { _ in
+                    Task { await model.synchronize(with: tunnel) }
+                }
+                .onReceive(clockTimer) { now in
+                    timerNow = now
+                }
+                .onChange(of: model.sessionStatus) { _, newStatus in
+                    if newStatus == .connected {
+                        if connectedSince == nil {
+                            connectedSince = Date()
+                        }
+                    } else {
+                        connectedSince = nil
+                    }
+                }
         }
     }
 }
 
 private extension ContentView {
     var loginView: some View {
-        VStack {
-            VStack(alignment: .leading, spacing: 18) {
+        VStack(spacing: 32) {
+            VStack(spacing: 12) {
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.blue.gradient)
+                
                 Text("PrivateClient")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                Text("Unofficial macOS client for Private Internet Access built on Partout.")
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                
+                Text("Unofficial macOS client for Private Internet Access.")
+                    .font(.title3)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
 
-                VStack(alignment: .leading, spacing: 12) {
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("PIA Username")
-                        .font(.caption.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
                     TextField("p1234567", text: $model.username)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .padding(12)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.separator, lineWidth: 0.5))
+                }
 
+                VStack(alignment: .leading, spacing: 8) {
                     Text("PIA Password")
-                        .font(.caption.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
                     SecureField("Password", text: $model.password)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .padding(12)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.separator, lineWidth: 0.5))
                 }
 
                 if let errorMessage = model.errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
-                        .font(.callout)
+                    HStack {
+                        Image(systemName: "exclamationmark.circle.fill")
+                        Text(errorMessage)
+                    }
+                    .foregroundStyle(.red)
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                Button("Sign In") {
+                Button {
                     Task { await model.signIn() }
+                } label: {
+                    HStack {
+                        if model.isBusy {
+                            ProgressView().controlSize(.small).padding(.trailing, 4)
+                        }
+                        Text("Sign In")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .disabled(!model.canSignIn || model.isBusy)
             }
-            .padding(24)
-            .frame(maxWidth: 460)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-
-            Spacer()
+            .padding(40)
+            .frame(maxWidth: 440)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32))
+            .shadow(color: .black.opacity(0.1), radius: 30, x: 0, y: 15)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
     }
 
     var mainView: some View {
-        VStack(spacing: 16) {
-            header
-            HSplitView {
-                serverListPane
-                detailPane
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        NavigationSplitView {
+            serverListPane
+                .navigationSplitViewColumnWidth(ideal: 300, max: 400)
+                .navigationTitle("Servers")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            Task { await model.refreshRegions() }
+                        } label: {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .disabled(model.isBusy)
+                        .help("Refresh Regions")
+                    }
+                }
+        } detail: {
+            detailPane
+                .navigationSplitViewColumnWidth(ideal: 600)
+                .navigationTitle(model.selectedRegion?.name ?? "Connection")
+                .toolbar {
+                    ToolbarItem(placement: .navigation) {
+                        statusBadge
+                    }
+                    
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button {
+                            isLogVisible.toggle()
+                        } label: {
+                            Label("Show Log", systemImage: "terminal")
+                        }
+                        .symbolVariant(isLogVisible ? .fill : .none)
+                        .help("Toggle Session Log")
+
+                        Button {
+                            Task { await model.signOut(using: tunnel) }
+                        } label: {
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                        .disabled(model.isBusy)
+                        .help("Sign Out")
+                    }
+                }
         }
-    }
-
-    var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Server Browser")
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 10, height: 10)
-                    Text(model.sessionStatus.label)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            HStack {
-                Button("Refresh") {
-                    Task { await model.refreshRegions() }
-                }
-                .disabled(model.isBusy)
-
-                Button("Sign Out") {
-                    Task { await model.signOut(using: tunnel) }
-                }
-                .disabled(model.isBusy)
-            }
+        .inspector(isPresented: $isLogVisible) {
+            logPane
+                .inspectorColumnWidth(min: 300, ideal: 350, max: 500)
         }
     }
 
     var serverListPane: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField("Search regions", text: $model.searchText)
-                .textFieldStyle(.roundedBorder)
-
-            List(selection: $model.selectedRegionID) {
-                ForEach(model.filteredRegions) { region in
-                    VStack(alignment: .leading, spacing: 4) {
+        List(selection: $model.selectedRegionID) {
+            ForEach(model.filteredRegions) { region in
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(region.name)
                             .font(.headline)
-                        HStack {
-                            Text(region.country)
-                            if region.geo == true {
-                                Text("Geo")
-                            }
-                            if region.portForward == true {
-                                Text("PF")
-                            }
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Text(region.country)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 4)
-                    .tag(region.id)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 6) {
+                        if region.geo == true {
+                            Image(systemName: "globe")
+                                .help("Geographic location")
+                        }
+                        if region.portForward == true {
+                            Image(systemName: "arrow.up.right.square")
+                                .help("Port Forwarding available")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
                 }
+                .padding(.vertical, 6)
+                .tag(region.id)
             }
         }
-        .frame(minWidth: 280, maxWidth: 340)
+        .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search regions")
+        .listStyle(.sidebar)
     }
 
     var detailPane: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            statusCard
-            protocolPicker
-            connectionButtons
-            logPane
+        ScrollView {
+            VStack(spacing: 32) {
+                if let region = model.selectedRegion {
+                    statusCard(for: region)
+                    
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text("Settings")
+                            .font(.title2.weight(.bold))
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Protocol")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                            
+                            Picker("Protocol", selection: $model.selectedTransport) {
+                                ForEach(VPNTransport.allCases) { transport in
+                                    Text(transport.displayName).tag(transport)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        .padding(24)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24))
+                    }
+                    
+                    connectionControl
+                } else {
+                    ContentUnavailableView(
+                        "No Region Selected",
+                        systemImage: "map",
+                        description: Text("Select a server from the list to get started.")
+                    )
+                    .padding(.top, 100)
+                }
+            }
+            .padding(40)
+            .frame(maxWidth: 600)
         }
-        .padding(.leading, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    var statusCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    func statusCard(for region: PIARegion) -> some View {
+        VStack(spacing: 24) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(model.sessionStatus == .connected ? "Protected" : "Unprotected")
+                        .font(.subheadline.weight(.black))
+                        .foregroundStyle(model.sessionStatus == .connected ? .green : .secondary)
+                        .textCase(.uppercase)
+                    
+                    Text(region.name)
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                    
+                    Text(region.country)
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: model.sessionStatus == .connected ? "shield.checkered" : "shield")
+                    .font(.system(size: 72))
+                    .foregroundStyle(model.sessionStatus == .connected ? Color.green.gradient : Color.secondary.gradient)
+            }
+            
             if model.sessionStatus == .connected {
-                Label("CONNECTED", systemImage: "checkmark.shield.fill")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(.green)
+                Divider()
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Duration")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(connectionDurationLabel)
+                            .font(.title2.monospacedDigit().weight(.semibold))
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Transport")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(model.selectedTransport.displayName)
+                            .font(.title2.weight(.semibold))
+                    }
+                }
             }
-            Text(model.selectedRegion?.name ?? "No Region Selected")
-                .font(.title2.weight(.semibold))
-            Text(model.selectedTransport.displayName)
-                .foregroundStyle(.secondary)
-            if model.sessionStatus == .connected, model.selectedRegion != nil {
-                Text(connectionDurationLabel)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.green)
-                    .monospacedDigit()
-            }
+            
             if let errorMessage = model.errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.red)
-                    .font(.callout)
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(errorMessage)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                .foregroundStyle(.red)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(32)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28))
     }
 
-    var protocolPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Protocol")
-                .font(.headline)
-            Picker("Protocol", selection: $model.selectedTransport) {
-                ForEach(VPNTransport.allCases) { transport in
-                    Text(transport.displayName).tag(transport)
-                }
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-
-    var connectionButtons: some View {
-        HStack {
-            Button(model.sessionStatus == .connected ? "Connected" : "Connect") {
-                guard model.sessionStatus != .connected else {
-                    return
-                }
+    var connectionControl: some View {
+        Button {
+            if model.sessionStatus == .connected {
+                Task { await model.disconnect(using: tunnel) }
+            } else {
                 Task { await model.connect(using: tunnel) }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(model.sessionStatus == .connected ? .green : nil)
-            .disabled(!model.canConnect || model.sessionStatus == .connected)
-
-            Button("Disconnect") {
-                Task { await model.disconnect(using: tunnel) }
+        } label: {
+            HStack(spacing: 12) {
+                if model.isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: model.sessionStatus == .connected ? "power.circle.fill" : "power")
+                        .font(.title)
+                }
+                
+                Text(model.sessionStatus == .connected ? "Disconnect" : "Connect Now")
+                    .font(.title3.weight(.bold))
             }
-            .disabled(model.currentProfileID == nil || model.isBusy)
+            .frame(maxWidth: .infinity)
+            .frame(height: 60)
         }
+        .buttonStyle(.glassProminent)
+        .tint(model.sessionStatus == .connected ? .red : .blue)
+        .disabled(!model.canConnect && model.sessionStatus != .connected)
     }
 
     var logPane: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Session Log")
-                .font(.headline)
-
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Session Log")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    isLogVisible = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            
+            Divider()
+            
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(model.logLines.enumerated()), id: \.offset) { entry in
                         Text(entry.element)
-                            .font(.system(.caption, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .padding(12)
+                .padding(.vertical, 12)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .scrollContentBackground(.hidden)
+            .background(Color(nsColor: .textBackgroundColor))
         }
+    }
+
+    var statusBadge: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+            Text(model.sessionStatus.label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 8)
     }
 
     var statusColor: Color {
@@ -269,15 +412,15 @@ private extension ContentView {
 
     var connectionDurationLabel: String {
         guard let connectedSince else {
-            return "Connected"
+            return "00:00"
         }
         let elapsed = max(0, Int(timerNow.timeIntervalSince(connectedSince)))
         let hours = elapsed / 3600
         let minutes = (elapsed % 3600) / 60
         let seconds = elapsed % 60
         if hours > 0 {
-            return String(format: "Connected for %d:%02d:%02d", hours, minutes, seconds)
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         }
-        return String(format: "Connected for %02d:%02d", minutes, seconds)
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 }
