@@ -389,36 +389,38 @@ private extension ContentView {
     }
 
     var detailPane: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             mapPane
-        }
-        .safeAreaInset(edge: .top) {
-            if let errorMessage = model.errorMessage, !errorMessage.isEmpty {
-                HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                    Text(errorMessage)
-                        .font(.callout)
-                        .lineLimit(3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Button("Dismiss") {
-                        model.errorMessage = nil
+
+            VStack(spacing: 0) {
+                if let errorMessage = model.errorMessage, !errorMessage.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                        Text(errorMessage)
+                            .font(.callout)
+                            .lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button("Dismiss") {
+                            model.errorMessage = nil
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-            }
-        }
-        .safeAreaInset(edge: .bottom) {
-            if let region = model.selectedRegion {
-                compactConnectionPanel(for: region)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                    .padding(.top, 8)
+                }
+
+                Spacer()
+
+                if let region = model.selectedRegion {
+                    compactConnectionPanel(for: region)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -461,6 +463,11 @@ private extension ContentView {
             }
         }
         .mapStyle(.standard(elevation: .automatic))
+        .mapControls {
+            MapZoomStepper()
+            MapScaleView()
+            MapCompass()
+        }
     }
 
     func compactConnectionPanel(for region: PIARegion) -> some View {
