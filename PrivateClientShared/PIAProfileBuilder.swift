@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import Network
 import Partout
@@ -132,18 +131,8 @@ extension PIAProfileBuilder {
         "\(PrivateClientConfiguration.appDisplayName): \(selection.region.name) \(selection.transport.displayName)"
     }
 
-    func profileID(for selection: ConnectionSelection) -> UUID {
-        let seed = "\(PrivateClientConfiguration.appBundleIdentifier)|\(selection.region.id)|\(selection.transport.rawValue)"
-        let digest = SHA256.hash(data: Data(seed.utf8))
-        let bytes = Array(digest.prefix(16))
-        let uuid = (
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5],
-            UInt8((bytes[6] & 0x0F) | 0x50),
-            UInt8((bytes[7] & 0x3F) | 0x80),
-            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
-        )
-        return UUID(uuid: uuid)
+    func profileID(for _: ConnectionSelection) -> UUID {
+        return PrivateClientConfiguration.tunnelProfileIdentifier
     }
 }
 

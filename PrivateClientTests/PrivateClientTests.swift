@@ -100,4 +100,42 @@ final class PrivateClientTests: XCTestCase {
 
         XCTAssertEqual(servers, ["10.0.0.243"])
     }
+
+    func testProfileIDIsStableAcrossSelections() {
+        let builder = PIAProfileBuilder(certificatePEM: "CERT")
+        let servers = PIARegionServers(
+            meta: [],
+            ovpntcp: [.init(ip: "2.2.2.2", cn: "tcp", van: true)],
+            ovpnudp: [.init(ip: "3.3.3.3", cn: "udp", van: true)],
+            wg: [.init(ip: "4.4.4.4", cn: "wg", van: nil)]
+        )
+        let regionA = PIARegion(
+            id: "uk_london",
+            name: "UK London",
+            country: "GB",
+            autoRegion: nil,
+            dns: "10.0.0.243",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: servers
+        )
+        let regionB = PIARegion(
+            id: "us_newyork",
+            name: "US New York",
+            country: "US",
+            autoRegion: nil,
+            dns: "10.0.0.242",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: servers
+        )
+
+        let idA = builder.profileID(for: .init(region: regionA, transport: .wireGuard))
+        let idB = builder.profileID(for: .init(region: regionB, transport: .openVPNTCP))
+
+        XCTAssertEqual(idA, idB)
+        XCTAssertEqual(idA, PrivateClientConfiguration.tunnelProfileIdentifier)
+    }
 }

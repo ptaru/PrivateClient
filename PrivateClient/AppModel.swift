@@ -206,9 +206,10 @@ final class AppModel {
                     handshake: handshake,
                     wireGuardPrivateKey: privateKey
                 )
-                try await tunnel.connect(to: builtProfile.profile) {
-                    "\(PrivateClientConfiguration.appDisplayName): \($0.name)"
-                }
+                try await connectWithAuthorizationRetry(
+                    profile: builtProfile.profile,
+                    using: tunnel
+                )
                 currentProfileID = builtProfile.profile.id
             case .openVPNUDP, .openVPNTCP:
                 handshake = nil
@@ -218,9 +219,10 @@ final class AppModel {
                     handshake: nil,
                     wireGuardPrivateKey: nil
                 )
-                try await tunnel.connect(to: builtProfile.profile) {
-                    "\(PrivateClientConfiguration.appDisplayName): \($0.name)"
-                }
+                try await connectWithAuthorizationRetry(
+                    profile: builtProfile.profile,
+                    using: tunnel
+                )
                 currentProfileID = builtProfile.profile.id
             }
 
@@ -301,6 +303,16 @@ private extension Error {
 
         return localizedDescription
     }
+
+    var isRecoverableFirstAuthorizationFailure: Bool {
+        let nsError = self as NSError
+        guard nsError.domain == NEVPNErrorDomain else {
+            return false
+        }
+        return nsError.code == NEVPNError.configurationInvalid.rawValue
+            || nsError.code == NEVPNError.configurationStale.rawValue
+            || nsError.code == NEVPNError.configurationReadWriteFailed.rawValue
+    }
 }
 
 private extension AppModel {
@@ -371,6 +383,26 @@ private extension AppModel {
             throw PIAProfileBuilderError.missingServer
         }
         return endpoint
+    }
+
+    func connectWithAuthorizationRetry(
+        profile: Profile,
+        using tunnel: TunnelObservable
+    ) async throws {
+        let title: @Sendable (Profile) -> String = {
+            "\(PrivateClientConfiguration.appDisplayName): \($0.name)"
+        }
+
+        do {
+            try await tunnel.connect(to: profile, title: title)
+        } catch {
+            guard error.isRecoverableFirstAuthorizationFailure else {
+                throw error
+            }
+            appendLog("VPN permission changed. Waiting for system configuration to settle...")
+            try await Task.sleep(for: .milliseconds(1200))
+            try await tunnel.connect(to: profile, title: title)
+        }
     }
 
     func cleanupStaleTunnelProfiles(keeping targetProfileID: Profile.ID? = nil) async throws {

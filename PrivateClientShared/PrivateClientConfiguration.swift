@@ -7,6 +7,7 @@ enum PrivateClientConfiguration {
     static let tunnelBundleIdentifier = "uk.tarun.PrivateClient.tunnel"
     static let appGroupIdentifier = "group.uk.tarun.PrivateClient"
     static let appDisplayName = "PrivateClient"
+    static let tunnelProfileIdentifier = UUID(uuidString: "6D5DF526-3A87-4A74-9AAE-1E3B5FA63B17")!
 
     static var sharedContainerURL: URL {
         if let containerURL = FileManager.default.containerURL(
