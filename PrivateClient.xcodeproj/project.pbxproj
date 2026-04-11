@@ -531,6 +531,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient;
 				PRODUCT_NAME = PrivateClient;
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -552,6 +553,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient.tunnel;
 				PRODUCT_NAME = PrivateClientTunnel;
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};
@@ -577,6 +579,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient;
 				PRODUCT_NAME = PrivateClient;
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -598,6 +601,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient.tunnel;
 				PRODUCT_NAME = PrivateClientTunnel;
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};
