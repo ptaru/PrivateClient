@@ -8,7 +8,14 @@ struct ContentView: View {
     @State
     private var tunnel = TunnelObservable.shared
 
+    @State
+    private var connectedSince: Date?
+
+    @State
+    private var timerNow = Date()
+
     private let refreshTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
+    private let clockTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Group {
@@ -26,6 +33,18 @@ struct ContentView: View {
         .onReceive(refreshTimer) { _ in
             Task {
                 await model.synchronize(with: tunnel)
+            }
+        }
+        .onReceive(clockTimer) { now in
+            timerNow = now
+        }
+        .onChange(of: model.sessionStatus) { _, newStatus in
+            if newStatus == .connected {
+                if connectedSince == nil {
+                    connectedSince = Date()
+                }
+            } else {
+                connectedSince = nil
             }
         }
     }
@@ -90,8 +109,13 @@ private extension ContentView {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Server Browser")
                     .font(.system(size: 30, weight: .semibold, design: .rounded))
-                Text(model.sessionStatus.label)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 10, height: 10)
+                    Text(model.sessionStatus.label)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
@@ -152,10 +176,21 @@ private extension ContentView {
 
     var statusCard: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if model.sessionStatus == .connected {
+                Label("CONNECTED", systemImage: "checkmark.shield.fill")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.green)
+            }
             Text(model.selectedRegion?.name ?? "No Region Selected")
                 .font(.title2.weight(.semibold))
             Text(model.selectedTransport.displayName)
                 .foregroundStyle(.secondary)
+            if model.sessionStatus == .connected, model.selectedRegion != nil {
+                Text(connectionDurationLabel)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .monospacedDigit()
+            }
             if let errorMessage = model.errorMessage {
                 Text(errorMessage)
                     .foregroundStyle(.red)
@@ -182,11 +217,15 @@ private extension ContentView {
 
     var connectionButtons: some View {
         HStack {
-            Button("Connect") {
+            Button(model.sessionStatus == .connected ? "Connected" : "Connect") {
+                guard model.sessionStatus != .connected else {
+                    return
+                }
                 Task { await model.connect(using: tunnel) }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!model.canConnect)
+            .tint(model.sessionStatus == .connected ? .green : nil)
+            .disabled(!model.canConnect || model.sessionStatus == .connected)
 
             Button("Disconnect") {
                 Task { await model.disconnect(using: tunnel) }
@@ -213,5 +252,32 @@ private extension ContentView {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
+    }
+
+    var statusColor: Color {
+        switch model.sessionStatus {
+        case .connected:
+            return .green
+        case .connecting, .disconnecting, .loadingServers, .signingIn:
+            return .orange
+        case .failed:
+            return .red
+        case .signedOut, .ready:
+            return .secondary
+        }
+    }
+
+    var connectionDurationLabel: String {
+        guard let connectedSince else {
+            return "Connected"
+        }
+        let elapsed = max(0, Int(timerNow.timeIntervalSince(connectedSince)))
+        let hours = elapsed / 3600
+        let minutes = (elapsed % 3600) / 60
+        let seconds = elapsed % 60
+        if hours > 0 {
+            return String(format: "Connected for %d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "Connected for %02d:%02d", minutes, seconds)
     }
 }
