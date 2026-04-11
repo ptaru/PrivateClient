@@ -303,35 +303,52 @@ private extension ContentView {
             List(selection: $model.selectedRegionID) {
                 ForEach(groupedRegions) { group in
                     if group.isCollapsible {
-                        DisclosureGroup(
-                            isExpanded: Binding(
-                                get: { isCountryExpanded(group.countryCode) },
-                                set: { isExpanded in
-                                    if isExpanded {
-                                        expandedCountries.insert(group.countryCode)
-                                    } else {
-                                        expandedCountries.remove(group.countryCode)
-                                    }
-                                }
-                            )
-                        ) {
-                            ForEach(group.regions, id: \.selectionID) { region in
-                                groupedRegionRow(region)
+                        let isExpanded = isCountryExpanded(group.countryCode)
+                        
+                        // Country Header Row
+                        HStack(alignment: .center, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(group.countryName)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(group.flagDisplay)
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
                             }
-                        } label: {
-                            HStack(alignment: .top, spacing: 12) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(group.countryName)
-                                        .font(.subheadline.weight(.semibold))
-                                    Text(group.flagDisplay)
-                                        .font(.headline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 8) {
                                 Text("\(group.regions.count)")
                                     .font(.caption.weight(.medium))
                                     .foregroundStyle(.secondary)
-                                    .padding(.top, 2)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.tertiary)
+                                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                let normalizedCode = group.countryCode.uppercased()
+                                if expandedCountries.contains(normalizedCode) {
+                                    expandedCountries.remove(normalizedCode)
+                                } else {
+                                    expandedCountries.insert(normalizedCode)
+                                    // Auto-select first item when expanding
+                                    if let firstRegion = group.regions.first {
+                                        model.selectedRegionID = firstRegion.selectionID
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if isExpanded {
+                            ForEach(group.regions, id: \.selectionID) { region in
+                                groupedRegionRow(region)
+                                    .padding(.leading, 16)
                             }
                         }
                     } else if let region = group.regions.first {
