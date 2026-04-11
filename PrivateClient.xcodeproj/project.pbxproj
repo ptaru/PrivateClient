@@ -14,8 +14,8 @@
 		291AF8D98795F8C2A86F6197 /* partout in Frameworks */ = {isa = PBXBuildFile; productRef = F66C27A730B4992098386CC3 /* partout */; };
 		414E253061E9B194CDFE4E1F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1317A04828FE24E33DF2D9 /* AppModel.swift */; };
 		4B60E22301FC971C3A09B91F /* AppSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62355CA84880C5E9FC862E97 /* AppSupport.swift */; };
+		5087BC0EF49BE1AC155BA86F /* RegionCoordinates.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1655127189B0BAEFC13863BB /* RegionCoordinates.generated.swift */; };
 		58AAE1E7C78270D3D323906E /* PrivateClientTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3986B76B8BC8E225AC09FAB2 /* PrivateClientTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		58FC55EC2F8A401500F01754 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 58FC55EB2F8A401500F01754 /* AppIcon.icon */; };
 		62D412FEE00F0BD83F310895 /* PIAModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB92151938BFED294644D96 /* PIAModels.swift */; };
 		78BD2182399C82A2C2C993A9 /* PIAAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D55C26B6AEBD6D4DB6D910A /* PIAAPIClient.swift */; };
 		9A227133941C875873B68442 /* ca.rsa.4096.crt in Resources */ = {isa = PBXBuildFile; fileRef = AF05B34226FA33E6747AA86F /* ca.rsa.4096.crt */; };
@@ -25,6 +25,8 @@
 		BE15C15EE3FD6468DC6D0B59 /* PrivateClientConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF698BD2571F1D0B0F5CF37 /* PrivateClientConfiguration.swift */; };
 		CADC06617455D879CF832AA5 /* PrivateClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A9107B8EA229390FCF7611 /* PrivateClientApp.swift */; };
 		D09B5392FC502814E03D9A4B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D277AC09B2893D4A64E8C58C /* ContentView.swift */; };
+		E1014F083895A12EA56E5364 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5E15C9EE3BF317ED42C63D35 /* AppIcon.icon */; };
+		E2BAAE966E09BF327C01E6C5 /* RegionCoordinateResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BEB8E5D69FF78145E983326 /* RegionCoordinateResolver.swift */; };
 		E61AE0177A78AF7ED7264D6D /* partout in Frameworks */ = {isa = PBXBuildFile; productRef = AA2D3F07B735C1306CAB22E9 /* partout */; };
 		EA15C87DA1D8B6289248F881 /* PIACredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA6DCF77CEDDCB7732E3F1D /* PIACredentialStore.swift */; };
 		EBD7815BECD8824DBBB7DD39 /* PrivateClientConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF698BD2571F1D0B0F5CF37 /* PrivateClientConfiguration.swift */; };
@@ -67,11 +69,13 @@
 /* Begin PBXFileReference section */
 		09ACD9F57904B2AE000D0370 /* TunnelSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelSupport.swift; sourceTree = "<group>"; };
 		14B74237AFB52FE2C3B65E96 /* PrivateClientTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrivateClientTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1655127189B0BAEFC13863BB /* RegionCoordinates.generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionCoordinates.generated.swift; sourceTree = "<group>"; };
+		1BEB8E5D69FF78145E983326 /* RegionCoordinateResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionCoordinateResolver.swift; sourceTree = "<group>"; };
 		1C7206D30C388C2EB614495B /* Tunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tunnel.entitlements; sourceTree = "<group>"; };
 		3986B76B8BC8E225AC09FAB2 /* PrivateClientTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PrivateClientTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		3DDB1A85BD3049BE04493582 /* PrivateClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateClientTests.swift; sourceTree = "<group>"; };
 		425F84250481990A7072D8D2 /* PIAProfileBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PIAProfileBuilder.swift; sourceTree = "<group>"; };
-		58FC55EB2F8A401500F01754 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		5E15C9EE3BF317ED42C63D35 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		62355CA84880C5E9FC862E97 /* AppSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSupport.swift; sourceTree = "<group>"; };
 		77A9107B8EA229390FCF7611 /* PrivateClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateClientApp.swift; sourceTree = "<group>"; };
 		7A441A3CEFA601503F9492EF /* Tunnel.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Tunnel.plist; sourceTree = "<group>"; };
@@ -149,13 +153,15 @@
 			children = (
 				89158D6612C4312773F3641C /* App.entitlements */,
 				EB0F4E528A81102EC5E90E3A /* App.plist */,
+				5E15C9EE3BF317ED42C63D35 /* AppIcon.icon */,
 				FB1317A04828FE24E33DF2D9 /* AppModel.swift */,
 				62355CA84880C5E9FC862E97 /* AppSupport.swift */,
 				D920E9C1DD4884D906E8A220 /* Assets.xcassets */,
 				D277AC09B2893D4A64E8C58C /* ContentView.swift */,
 				77A9107B8EA229390FCF7611 /* PrivateClientApp.swift */,
+				1BEB8E5D69FF78145E983326 /* RegionCoordinateResolver.swift */,
+				1655127189B0BAEFC13863BB /* RegionCoordinates.generated.swift */,
 				AC8D7FB9E432A1B1F73EFDA5 /* Resources */,
-				58FC55EB2F8A401500F01754 /* AppIcon.icon */,
 			);
 			path = PrivateClient;
 			sourceTree = "<group>";
@@ -309,9 +315,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1014F083895A12EA56E5364 /* AppIcon.icon in Resources */,
 				F9B9BBE1E1ED3B252BEC5635 /* Assets.xcassets in Resources */,
 				9A227133941C875873B68442 /* ca.rsa.4096.crt in Resources */,
-				58FC55EC2F8A401500F01754 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,6 +351,8 @@
 				B8B7B9E26EDFAAE1BE5A56AA /* PIAProfileBuilder.swift in Sources */,
 				CADC06617455D879CF832AA5 /* PrivateClientApp.swift in Sources */,
 				BE15C15EE3FD6468DC6D0B59 /* PrivateClientConfiguration.swift in Sources */,
+				E2BAAE966E09BF327C01E6C5 /* RegionCoordinateResolver.swift in Sources */,
+				5087BC0EF49BE1AC155BA86F /* RegionCoordinates.generated.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -523,7 +531,6 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient;
 				PRODUCT_NAME = PrivateClient;
-				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -545,7 +552,6 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient.tunnel;
 				PRODUCT_NAME = PrivateClientTunnel;
-				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};
@@ -571,7 +577,6 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient;
 				PRODUCT_NAME = PrivateClient;
-				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -593,7 +598,6 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient.tunnel;
 				PRODUCT_NAME = PrivateClientTunnel;
-				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};

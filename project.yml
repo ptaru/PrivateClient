@@ -11,6 +11,27 @@ packages:
   Partout:
     url: https://github.com/partout-io/partout
     branch: master
+schemes:
+  PrivateClient:
+    build:
+      targets:
+        PrivateClient: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - PrivateClientTests
+    archive:
+      config: Release
+  PrivateClientTunnel:
+    build:
+      targets:
+        PrivateClientTunnel: all
+    run:
+      config: Debug
+    archive:
+      config: Release
 targets:
   PrivateClient:
     type: application

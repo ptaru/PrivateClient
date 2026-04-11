@@ -1,4 +1,5 @@
 import Partout
+import MapKit
 import SwiftUI
 
 struct ContentView: View {
@@ -18,6 +19,14 @@ struct ContentView: View {
 
     @State
     private var columnVisibility: NavigationSplitViewVisibility = .automatic
+
+    @State
+    private var mapPosition = MapCameraPosition.region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
+            span: MKCoordinateSpan(latitudeDelta: 120, longitudeDelta: 120)
+        )
+    )
 
     private let refreshTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
     private let clockTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
@@ -145,7 +154,7 @@ private extension ContentView {
         } detail: {
             detailPane
                 .navigationSplitViewColumnWidth(ideal: 600)
-                .navigationTitle(model.selectedRegion?.name ?? "Connection")
+                .navigationTitle("PrivateClient")
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
                         if columnVisibility == .detailOnly {
@@ -217,83 +226,149 @@ private extension ContentView {
     }
 
     var serverListPane: some View {
-        List(selection: $model.selectedRegionID) {
-            ForEach(model.filteredRegions, id: \.selectionID) { region in
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(region.name)
-                            .font(.headline)
-                        Text(region.country)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 6) {
-                        if region.geo == true {
-                            Image(systemName: "globe")
-                                .help("Geographic location")
+        ScrollViewReader { proxy in
+            List(selection: $model.selectedRegionID) {
+                ForEach(model.filteredRegions, id: \.selectionID) { region in
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(region.name)
+                                .font(.headline)
+                            Text(region.country)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                        if region.portForward == true {
-                            Image(systemName: "arrow.up.right.square")
-                                .help("Port Forwarding available")
+
+                        Spacer()
+
+                        HStack(spacing: 6) {
+                            if region.geo == true {
+                                Image(systemName: "globe")
+                                    .help("Geographic location")
+                            }
+                            if region.portForward == true {
+                                Image(systemName: "arrow.up.right.square")
+                                    .help("Port Forwarding available")
+                            }
                         }
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 6)
+                    .tag(region.selectionID)
+                    .id(region.selectionID)
                 }
-                .padding(.vertical, 6)
-                .tag(region.selectionID)
             }
+            .onChange(of: model.selectedRegionID) { _, newSelection in
+                guard let newSelection else {
+                    return
+                }
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    proxy.scrollTo(newSelection, anchor: .center)
+                }
+                DispatchQueue.main.async {
+                    proxy.scrollTo(newSelection, anchor: .center)
+                }
+            }
+            .onAppear {
+                guard let selected = model.selectedRegionID else {
+                    return
+                }
+                proxy.scrollTo(selected, anchor: .center)
+                DispatchQueue.main.async {
+                    proxy.scrollTo(selected, anchor: .center)
+                }
+            }
+            .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search regions")
+            .listStyle(.sidebar)
         }
-        .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search regions")
-        .listStyle(.sidebar)
     }
 
     var detailPane: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                if let region = model.selectedRegion {
-                    statusCard(for: region)
-                    
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("SETTINGS")
-                            .font(.system(size: 11, weight: .black))
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, 8)
-                        
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Protocol")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                            
-                            Picker("Protocol", selection: $model.selectedTransport) {
-                                ForEach(VPNTransport.allCases) { transport in
-                                    Text(transport.displayName).tag(transport)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                        }
-                        .padding(24)
-                        .frame(maxWidth: .infinity)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-                    }
-                    
-                    connectionControl
-                } else {
-                    ContentUnavailableView(
-                        "No Region Selected",
-                        systemImage: "map",
-                        description: Text("Select a server from the list to get started.")
-                    )
-                    .padding(.top, 100)
-                }
+        ZStack {
+            mapPane
+        }
+        .safeAreaInset(edge: .bottom) {
+            if let region = model.selectedRegion {
+                compactConnectionPanel(for: region)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
             }
-            .padding(40)
-            .frame(maxWidth: 600)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    var mapPane: some View {
+        Map(position: $mapPosition) {
+            ForEach(mapRegions) { mapRegion in
+                Annotation(mapRegion.region.name, coordinate: mapRegion.coordinate) {
+                    ZStack {
+                        Image(systemName: mapRegion.region.selectionID == model.selectedRegionID ? "shield.fill" : "shield")
+                            .font(.system(size: mapRegion.region.selectionID == model.selectedRegionID ? 24 : 16, weight: .semibold))
+                            .foregroundStyle(.green)
+                    }
+                    .contentShape(Rectangle())
+                    .shadow(radius: mapRegion.region.selectionID == model.selectedRegionID ? 4 : 2)
+                    .onTapGesture {
+                        model.selectedRegionID = mapRegion.region.selectionID
+                    }
+                }
+            }
+        }
+        .mapStyle(.standard(elevation: .automatic))
+        .ignoresSafeArea(.container, edges: .all)
+    }
+
+    func compactConnectionPanel(for region: PIARegion) -> some View {
+        let isActuallyConnected = model.sessionStatus == .connected && model.connectedRegion?.id == region.id
+        let isBusy = model.isBusy
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(isActuallyConnected ? Color.green : Color.secondary)
+                    .frame(width: 8, height: 8)
+                Text(isActuallyConnected ? "Connected to \(region.name)" : region.name)
+                    .font(.headline)
+                Spacer()
+                if isActuallyConnected {
+                    Text(connectionDurationLabel)
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: 10) {
+                Picker("Protocol", selection: $model.selectedTransport) {
+                    ForEach(VPNTransport.allCases) { transport in
+                        Text(transport.displayName).tag(transport)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Button {
+                    if isActuallyConnected {
+                        Task { await model.disconnect(using: tunnel) }
+                    } else {
+                        Task { await model.connect(using: tunnel) }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isBusy {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(isActuallyConnected ? "Disconnect" : "Connect")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(minWidth: 120)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(isActuallyConnected ? .red : .green)
+                .disabled((!model.canConnect && !isActuallyConnected) || isBusy)
+            }
+        }
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
     }
 
     func statusCard(for region: PIARegion) -> some View {
@@ -449,4 +524,71 @@ private extension ContentView {
         }
         return String(format: "%02d:%02d", minutes, seconds)
     }
+
+    var mapRegions: [MapRegion] {
+        let baseRegions: [MapRegion] = model.filteredRegions.compactMap { region -> MapRegion? in
+            guard let coordinate = RegionCoordinateResolver.coordinate(for: region) else {
+                return nil
+            }
+            return MapRegion(region: region, coordinate: coordinate)
+        }
+        return spreadOverlappingMarkers(baseRegions)
+    }
+
+    func spreadOverlappingMarkers(_ regions: [MapRegion]) -> [MapRegion] {
+        let gridSize = 0.02
+        let grouped = Dictionary(grouping: regions) { marker in
+            let latKey = Int((marker.coordinate.latitude / gridSize).rounded())
+            let lonKey = Int((marker.coordinate.longitude / gridSize).rounded())
+            return "\(latKey):\(lonKey)"
+        }
+
+        var output: [MapRegion] = []
+        output.reserveCapacity(regions.count)
+
+        for group in grouped.values {
+            if group.count == 1 {
+                output.append(group[0])
+                continue
+            }
+
+            let sorted = group.sorted { $0.id < $1.id }
+            for (index, marker) in sorted.enumerated() {
+                let offset = markerOffset(index: index, count: sorted.count, atLatitude: marker.coordinate.latitude)
+                let adjusted = CLLocationCoordinate2D(
+                    latitude: max(-85, min(85, marker.coordinate.latitude + offset.latitude)),
+                    longitude: normalizedLongitude(marker.coordinate.longitude + offset.longitude)
+                )
+                output.append(MapRegion(region: marker.region, coordinate: adjusted))
+            }
+        }
+
+        return output
+    }
+
+    func markerOffset(index: Int, count: Int, atLatitude latitude: Double) -> CLLocationCoordinate2D {
+        guard count > 1 else {
+            return .init(latitude: 0, longitude: 0)
+        }
+        let goldenAngle = 2.399963229728653
+        let ringScale = 0.045
+        let radius = ringScale * sqrt(Double(index + 1))
+        let angle = Double(index) * goldenAngle
+        let latOffset = radius * cos(angle)
+        let cosLat = max(0.25, abs(cos(latitude * .pi / 180)))
+        let lonOffset = (radius * sin(angle)) / cosLat
+        return .init(latitude: latOffset, longitude: lonOffset)
+    }
+
+    func normalizedLongitude(_ longitude: Double) -> Double {
+        var value = longitude
+        while value > 180 {
+            value -= 360
+        }
+        while value < -180 {
+            value += 360
+        }
+        return value
+    }
+
 }
