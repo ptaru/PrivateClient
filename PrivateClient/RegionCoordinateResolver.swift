@@ -12,128 +12,24 @@ struct MapRegion: Identifiable {
 
 enum RegionCoordinateResolver {
     static func coordinate(for region: PIARegion) -> CLLocationCoordinate2D? {
-        if let exactByID = manualRegionOverrides[region.id.lowercased()] {
-            return exactByID
-        }
-        let haystack = normalized("\(region.id) \(region.name)")
-
-        if let city = firstMatch(in: cityCenters, haystack: haystack) {
-            return city
-        }
-        if let subRegion = firstMatch(in: regionalCenters, haystack: haystack) {
-            return subRegion
-        }
-
-        if let capital = countryCapitals[region.country.uppercased()] {
-            return capital
-        }
-
         if let exact = GeneratedRegionCoordinates.regions[regionKey(for: region)] {
             return exact
         }
-        guard let base = GeneratedRegionCoordinates.countryCentroids[region.country.uppercased()] else {
-            return nil
+        
+        if let capital = countryCapitals[region.country.uppercased()] {
+            // Use deterministic offsets when falling back to a capital to avoid stacking multiple pins
+            let (latOffset, lonOffset) = deterministicOffsets(for: region.selectionID)
+            return CLLocationCoordinate2D(
+                latitude: max(-85, min(85, capital.latitude + latOffset)),
+                longitude: wrappedLongitude(capital.longitude + lonOffset)
+            )
         }
-        let (latOffset, lonOffset) = deterministicOffsets(for: region.selectionID)
-        let latitude = max(-85, min(85, base.latitude + latOffset))
-        let longitude = wrappedLongitude(base.longitude + lonOffset)
-        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+
+        return nil
     }
 }
 
 private extension RegionCoordinateResolver {
-    static let manualRegionOverrides: [String: CLLocationCoordinate2D] = [
-        "uk_manchester": .init(latitude: 53.4808, longitude: -2.2426),
-        "uk_southampton": .init(latitude: 50.9097, longitude: -1.4044),
-        "ad": .init(latitude: 42.5063, longitude: 1.5218),
-        "monaco": .init(latitude: 43.7384, longitude: 7.4246),
-        "us_seattle": .init(latitude: 47.6062, longitude: -122.3321),
-        "us_new_hampshire-pf": .init(latitude: 43.2081, longitude: -71.5376),
-        "us_massachusetts-pf": .init(latitude: 42.4072, longitude: -71.3824),
-        "au_adelaide-pf": .init(latitude: -34.9285, longitude: 138.6007),
-        "au_brisbane-pf": .init(latitude: -27.4698, longitude: 153.0251),
-        "aus_perth": .init(latitude: -31.9523, longitude: 115.8613),
-        "au_australia-so": .init(latitude: -35.2700, longitude: 149.1300), // Canberra
-        "italy_2": .init(latitude: 41.9000, longitude: 12.4800), // Rome
-        "us-streaming": .init(latitude: 38.9072, longitude: -77.0369), // Washington DC
-        "uk_2": .init(latitude: 52.4862, longitude: -1.8904) // Birmingham
-    ]
-
-    static let cityCenters: [String: CLLocationCoordinate2D] = [
-        "washington dc": .init(latitude: 38.9072, longitude: -77.0369),
-        "silicon valley": .init(latitude: 37.3875, longitude: -122.0575),
-        "salt lake city": .init(latitude: 40.7608, longitude: -111.8910),
-        "las vegas": .init(latitude: 36.1699, longitude: -115.1398),
-        "new york": .init(latitude: 40.7128, longitude: -74.0060),
-        "seattle": .init(latitude: 47.6062, longitude: -122.3321),
-        "wilmington": .init(latitude: 39.7391, longitude: -75.5398),
-        "baltimore": .init(latitude: 39.2904, longitude: -76.6122),
-        "honolulu": .init(latitude: 21.3069, longitude: -157.8583),
-        "atlanta": .init(latitude: 33.7490, longitude: -84.3880),
-        "houston": .init(latitude: 29.7604, longitude: -95.3698),
-        "chicago": .init(latitude: 41.8781, longitude: -87.6298),
-        "denver": .init(latitude: 39.7392, longitude: -104.9903),
-        "valencia": .init(latitude: 39.4699, longitude: -0.3763),
-        "berlin": .init(latitude: 52.5200, longitude: 13.4050),
-        "frankfurt": .init(latitude: 50.1109, longitude: 8.6821),
-        "copenhagen": .init(latitude: 55.6761, longitude: 12.5683),
-        "adelaide": .init(latitude: -34.9285, longitude: 138.6007),
-        "brisbane": .init(latitude: -27.4698, longitude: 153.0251),
-        "melbourne": .init(latitude: -37.8136, longitude: 144.9631),
-        "perth": .init(latitude: -31.9523, longitude: 115.8613),
-        "sydney": .init(latitude: -33.8688, longitude: 151.2093),
-        "milano": .init(latitude: 45.4642, longitude: 9.1900),
-        "milan": .init(latitude: 45.4642, longitude: 9.1900),
-        "toronto": .init(latitude: 43.6532, longitude: -79.3832),
-        "montreal": .init(latitude: 45.5017, longitude: -73.5673),
-        "vancouver": .init(latitude: 49.2827, longitude: -123.1207),
-        "macao": .init(latitude: 22.1987, longitude: 113.5439)
-    ]
-
-    static let regionalCenters: [String: CLLocationCoordinate2D] = [
-        "us east": .init(latitude: 39.9526, longitude: -75.1652),
-        "us west": .init(latitude: 36.7783, longitude: -119.4179),
-        "ontario": .init(latitude: 50.0000, longitude: -85.0000),
-        "alabama": .init(latitude: 32.8067, longitude: -86.7911),
-        "alaska": .init(latitude: 61.3707, longitude: -152.4044),
-        "arkansas": .init(latitude: 34.9697, longitude: -92.3731),
-        "california": .init(latitude: 36.7783, longitude: -119.4179),
-        "connecticut": .init(latitude: 41.6032, longitude: -73.0877),
-        "florida": .init(latitude: 27.6648, longitude: -81.5158),
-        "idaho": .init(latitude: 44.0682, longitude: -114.7420),
-        "iowa": .init(latitude: 41.8780, longitude: -93.0977),
-        "kansas": .init(latitude: 39.0119, longitude: -98.4842),
-        "kentucky": .init(latitude: 37.8393, longitude: -84.2700),
-        "louisiana": .init(latitude: 30.9843, longitude: -91.9623),
-        "maine": .init(latitude: 45.2538, longitude: -69.4455),
-        "massachusetts": .init(latitude: 42.4072, longitude: -71.3824),
-        "michigan": .init(latitude: 44.3148, longitude: -85.6024),
-        "minnesota": .init(latitude: 46.7296, longitude: -94.6859),
-        "mississippi": .init(latitude: 32.3547, longitude: -89.3985),
-        "missouri": .init(latitude: 37.9643, longitude: -91.8318),
-        "montana": .init(latitude: 46.8797, longitude: -110.3626),
-        "nebraska": .init(latitude: 41.4925, longitude: -99.9018),
-        "new hampshire": .init(latitude: 43.1939, longitude: -71.5724),
-        "new mexico": .init(latitude: 34.5199, longitude: -105.8701),
-        "north carolina": .init(latitude: 35.7596, longitude: -79.0193),
-        "north dakota": .init(latitude: 47.5515, longitude: -101.0020),
-        "ohio": .init(latitude: 40.4173, longitude: -82.9071),
-        "oklahoma": .init(latitude: 35.0078, longitude: -97.0929),
-        "oregon": .init(latitude: 43.8041, longitude: -120.5542),
-        "pennsylvania": .init(latitude: 41.2033, longitude: -77.1945),
-        "rhode island": .init(latitude: 41.5801, longitude: -71.4774),
-        "south carolina": .init(latitude: 33.8361, longitude: -81.1637),
-        "south dakota": .init(latitude: 43.9695, longitude: -99.9018),
-        "tennessee": .init(latitude: 35.5175, longitude: -86.5804),
-        "texas": .init(latitude: 31.9686, longitude: -99.9018),
-        "vermont": .init(latitude: 44.5588, longitude: -72.5778),
-        "virginia": .init(latitude: 37.4316, longitude: -78.6569),
-        "west virginia": .init(latitude: 38.5976, longitude: -80.4549),
-        "wisconsin": .init(latitude: 43.7844, longitude: -88.7879),
-        "wyoming": .init(latitude: 43.0760, longitude: -107.2903),
-        "indiana": .init(latitude: 40.2672, longitude: -86.1349)
-    ]
-
     static let countryCapitals: [String: CLLocationCoordinate2D] = [
         "AD": .init(latitude: 42.5000, longitude: 1.5200),
         "AE": .init(latitude: 24.4700, longitude: 54.3700),
@@ -229,33 +125,6 @@ private extension RegionCoordinateResolver {
 
     static func regionKey(for region: PIARegion) -> String {
         "\(region.id)|\(region.name)".lowercased()
-    }
-
-    static func firstMatch(
-        in map: [String: CLLocationCoordinate2D],
-        haystack: String
-    ) -> CLLocationCoordinate2D? {
-        for key in map.keys.sorted(by: { $0.count > $1.count }) {
-            if haystack.contains(key) {
-                return map[key]
-            }
-        }
-        return nil
-    }
-
-    static func normalized(_ input: String) -> String {
-        let lower = input.lowercased()
-        let mapped = lower.unicodeScalars.map { scalar -> Character in
-            if CharacterSet.alphanumerics.contains(scalar) || scalar == " " {
-                return Character(scalar)
-            }
-            return " "
-        }
-        return String(mapped).replacingOccurrences(
-            of: "\\s+",
-            with: " ",
-            options: .regularExpression
-        )
     }
 
     static func deterministicOffsets(for key: String) -> (Double, Double) {
