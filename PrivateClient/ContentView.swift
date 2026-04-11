@@ -183,7 +183,6 @@ private extension ContentView {
             logPane
                 .inspectorColumnWidth(min: 300, ideal: 350, max: 500)
         }
-        .navigationSplitViewStyle(.balanced)
     }
 
     func sidebarStatusCard(for region: PIARegion) -> some View {
@@ -270,11 +269,13 @@ private extension ContentView {
                 if let region = model.selectedRegion {
                     statusCard(for: region)
                     
-                    VStack(alignment: .leading, spacing: 20) {
-                        Text("Settings")
-                            .font(.title2.weight(.bold))
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("SETTINGS")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 8)
                         
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 16) {
                             Text("Protocol")
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
@@ -287,7 +288,8 @@ private extension ContentView {
                             .pickerStyle(.segmented)
                         }
                         .padding(24)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24))
+                        .frame(maxWidth: .infinity)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
                     }
                     
                     connectionControl
@@ -367,8 +369,9 @@ private extension ContentView {
                 .foregroundStyle(.red)
             }
         }
-        .padding(32)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28))
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 
     var connectionControl: some View {
@@ -403,40 +406,21 @@ private extension ContentView {
     }
 
     var logPane: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Session Log")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    isLogVisible = false
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(model.logLines.enumerated()), id: \.offset) { entry in
+                    Text(entry.element)
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.plain)
             }
-            .padding()
-            .background(.ultraThinMaterial)
-            
-            Divider()
-            
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(model.logLines.enumerated()), id: \.offset) { entry in
-                        Text(entry.element)
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .padding(.vertical, 12)
-            }
-            .scrollContentBackground(.hidden)
-            .background(Color(nsColor: .textBackgroundColor))
+            .padding(.vertical, 12)
         }
+        .scrollContentBackground(.hidden)
+        .background(Color(nsColor: .textBackgroundColor))
     }
 
     var statusBadge: some View {
