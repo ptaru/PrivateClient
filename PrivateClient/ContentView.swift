@@ -43,6 +43,7 @@ struct ContentView: View {
     var body: some View {
         if !model.isSignedIn {
             loginView
+                .containerBackground(.clear, for: .window)
                 .task {
                     await model.synchronize(with: tunnel)
                 }
@@ -146,11 +147,13 @@ private extension ContentView {
             }
             .padding(40)
             .frame(maxWidth: 440)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 32))
+            .overlay(RoundedRectangle(cornerRadius: 32).stroke(.white.opacity(0.1), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.1), radius: 30, x: 0, y: 15)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.ultraThinMaterial)
     }
 
     var mainView: some View {
@@ -169,6 +172,8 @@ private extension ContentView {
                 .navigationTitle("PrivateClient")
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
+                        Spacer()
+
                         if columnVisibility == .detailOnly {
                             Button {
                                 isStatusPopoverVisible.toggle()

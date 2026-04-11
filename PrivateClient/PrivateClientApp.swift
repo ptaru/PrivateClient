@@ -12,6 +12,7 @@ struct PrivateClientApp: App {
         WindowGroup {
             ContentView(model: model, tunnel: tunnel)
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .newItem) {
                 Button("Refresh Regions") {
