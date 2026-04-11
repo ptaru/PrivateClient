@@ -574,24 +574,33 @@ private struct PIAWireGuardAuthenticator {
 }
 
 extension AppModel: CLLocationManagerDelegate {
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        switch manager.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse:
-            if selectedRegionID == nil, let location = manager.location {
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        let location = manager.location
+        Task { @MainActor in
+            switch status {
+            case .authorizedAlways, .authorizedWhenInUse:
+                if selectedRegionID == nil, let location {
+                    selectClosestRegion(to: location)
+                }
+            default:
+                break
+            }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.first else { return }
+        Task { @MainActor in
+            if selectedRegionID == nil {
                 selectClosestRegion(to: location)
             }
-        default:
-            break
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if selectedRegionID == nil, let location = locations.first {
-            selectClosestRegion(to: location)
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            appendLog("Location manager failed: \(error.localizedDescription)")
         }
-    }
-
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        appendLog("Location manager failed: \(error.localizedDescription)")
     }
 }
