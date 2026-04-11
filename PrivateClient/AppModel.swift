@@ -20,6 +20,7 @@ final class AppModel {
     var currentProfileID: Profile.ID?
     var isBootstrapped = false
     var isSignedIn = false
+    var isExpectingDisconnect = false
 
     private let apiClient: PIAAPIClientProtocol
     private let credentialStore: PIACredentialStore
@@ -140,6 +141,7 @@ final class AppModel {
 
     func signOut(using tunnel: TunnelObservable) async {
         if let currentProfileID {
+            isExpectingDisconnect = true
             do {
                 try await tunnel.disconnect(from: currentProfileID)
             } catch {
@@ -163,18 +165,20 @@ final class AppModel {
         logLines = []
         isSignedIn = false
         sessionStatus = .signedOut
+        isExpectingDisconnect = false
     }
 
     func refreshRegions() async {
         guard isAuthenticated else {
             return
         }
-        sessionStatus = .loadingServers
+        let wasConnected = sessionStatus == .connected
+        sessionStatus = wasConnected ? .connected : .loadingServers
         errorMessage = nil
 
         do {
             try await loadRegions()
-            sessionStatus = .ready
+            sessionStatus = wasConnected ? .connected : .ready
             appendLog("Refreshed server list.")
         } catch {
             let message = error.presentableDescription
@@ -192,6 +196,7 @@ final class AppModel {
 
         if sessionStatus == .connected {
             appendLog("Switching servers. Disconnecting from current session...")
+            isExpectingDisconnect = true
             await disconnect(using: tunnel)
             // Wait a moment for the system to settle
             try? await Task.sleep(for: .milliseconds(500))
@@ -247,6 +252,7 @@ final class AppModel {
             connectedRegionID = region.selectionID
             connectedTransport = selectedTransport
             sessionStatus = .connected
+            isExpectingDisconnect = false
             appendLog("Connected to \(region.name) using \(selectedTransport.displayName).")
             await refreshLog(using: tunnel)
         } catch {
@@ -262,6 +268,7 @@ final class AppModel {
             return
         }
 
+        isExpectingDisconnect = true
         sessionStatus = .disconnecting
         errorMessage = nil
 
@@ -271,6 +278,7 @@ final class AppModel {
             connectedRegionID = nil
             connectedTransport = nil
             sessionStatus = .ready
+            isExpectingDisconnect = false
             appendLog("Disconnected from VPN.")
             await refreshLog(using: tunnel)
         } catch {
@@ -278,18 +286,28 @@ final class AppModel {
             sessionStatus = .failed(message)
             errorMessage = message
             appendLog("Disconnect failed: \(message)")
+            isExpectingDisconnect = false
         }
     }
 
     func synchronize(with tunnel: TunnelObservable) async {
         switch tunnel.status {
         case .inactive:
+            let previousStatus = sessionStatus
             currentProfileID = nil
             connectedRegionID = nil
             connectedTransport = nil
-            if isAuthenticated, !isBusy, sessionStatus != .ready {
-                sessionStatus = .ready
+            if isAuthenticated, !isBusy {
+                if !isExpectingDisconnect, previousStatus == .connected || previousStatus == .connecting {
+                    let message = "VPN disconnected unexpectedly. Check extension permissions and Network Extension configuration."
+                    sessionStatus = .failed(message)
+                    errorMessage = message
+                    appendLog(message)
+                } else if sessionStatus != .ready {
+                    sessionStatus = .ready
+                }
             }
+            isExpectingDisconnect = false
         case .activating:
             if sessionStatus != .connecting {
                 sessionStatus = .connecting
@@ -302,6 +320,7 @@ final class AppModel {
             if sessionStatus != .connected {
                 sessionStatus = .connected
             }
+            isExpectingDisconnect = false
         }
 
         await refreshLog(using: tunnel)
@@ -322,7 +341,15 @@ private extension Error {
 
         let nsError = self as NSError
         if nsError.domain == NEVPNErrorDomain {
-            return "\(nsError.domain) \(nsError.code): \(nsError.localizedDescription)"
+            return "VPN configuration error (\(nsError.domain) \(nsError.code)): \(nsError.localizedDescription) \(nsError.recoveryHintText)"
+        }
+
+        if nsError.domain == "NEConfigurationErrorDomain" {
+            return "Network Extension communication error (\(nsError.domain) \(nsError.code)): \(nsError.localizedDescription) \(nsError.recoveryHintText)"
+        }
+
+        if nsError.domain == NSURLErrorDomain {
+            return "Network request failed (\(nsError.domain) \(nsError.code)): \(nsError.localizedDescription) \(nsError.recoveryHintText)"
         }
 
         return localizedDescription
@@ -336,6 +363,42 @@ private extension Error {
         return nsError.code == NEVPNError.configurationInvalid.rawValue
             || nsError.code == NEVPNError.configurationStale.rawValue
             || nsError.code == NEVPNError.configurationReadWriteFailed.rawValue
+    }
+}
+
+private extension NSError {
+    var recoveryHintText: String {
+        if domain == NEVPNErrorDomain {
+            if code == NEVPNError.configurationInvalid.rawValue
+                || code == NEVPNError.configurationStale.rawValue
+                || code == NEVPNError.configurationReadWriteFailed.rawValue {
+                return "Try restarting the app. If it persists, remove stale PrivateClient VPN profiles in System Settings > VPN and reconnect."
+            }
+            if code == NEVPNError.configurationDisabled.rawValue {
+                return "Enable the VPN configuration in System Settings > VPN and try again."
+            }
+            if code == NEVPNError.connectionFailed.rawValue {
+                return "The tunnel extension could not establish a session. Check tunnel logs for protocol-level details."
+            }
+        }
+
+        if domain == "NEConfigurationErrorDomain" && code == 11 {
+            return "The Network Extension service connection is unavailable. Fully quit PrivateClient and relaunch."
+        }
+
+        if domain == NSURLErrorDomain {
+            if code == NSURLErrorCannotFindHost {
+                return "The API hostname could not be resolved. Check DNS/network connectivity."
+            }
+            if code == NSURLErrorSecureConnectionFailed || code == NSURLErrorServerCertificateUntrusted {
+                return "TLS validation failed for the VPN endpoint. Verify endpoint host/certificate handling."
+            }
+            if code == NSURLErrorTimedOut {
+                return "The request timed out. The endpoint may be overloaded; retry with another region."
+            }
+        }
+
+        return ""
     }
 }
 
@@ -403,7 +466,11 @@ private extension AppModel {
             }
             logLines = Array(log.lines.map(PrivateClientConfiguration.Log.formattedLine).reversed())
         } catch {
-            appendLog("Tunnel log fetch failed: \(error.localizedDescription)")
+            appendLog("Tunnel log fetch failed: \(error.presentableDescription)")
+            let nsError = error as NSError
+            if nsError.domain == "NEConfigurationErrorDomain" || nsError.domain == NEVPNErrorDomain {
+                errorMessage = error.presentableDescription
+            }
         }
     }
 

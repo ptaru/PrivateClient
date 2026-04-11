@@ -21,6 +21,9 @@ struct ContentView: View {
     private var columnVisibility: NavigationSplitViewVisibility = .automatic
 
     @State
+    private var isStatusPopoverVisible = false
+
+    @State
     private var mapPosition = MapCameraPosition.region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
@@ -158,7 +161,16 @@ private extension ContentView {
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
                         if columnVisibility == .detailOnly {
-                            statusBadge
+                            Button {
+                                isStatusPopoverVisible.toggle()
+                            } label: {
+                                statusBadge
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(model.connectedRegion == nil)
+                            .popover(isPresented: $isStatusPopoverVisible, arrowEdge: .top) {
+                                statusPopoverContent
+                            }
                         }
 
                         Button {
@@ -186,6 +198,13 @@ private extension ContentView {
     }
 
     func sidebarStatusCard(for region: PIARegion) -> some View {
+        statusCardContent(for: region)
+            .padding(14)
+            .glassEffect(in: .rect(cornerRadius: 18))
+            .padding(10)
+    }
+
+    func statusCardContent(for region: PIARegion) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -226,9 +245,29 @@ private extension ContentView {
             .tint(.red)
             .controlSize(.small)
         }
-        .padding(14)
-        .glassEffect(in: .rect(cornerRadius: 18))
-        .padding(10)
+    }
+
+    var statusPopoverContent: some View {
+        Group {
+            if let connectedRegion = model.connectedRegion {
+                statusCardContent(for: connectedRegion)
+                    .padding(14)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 8, height: 8)
+                        Text(model.sessionStatus.label)
+                            .font(.headline)
+                    }
+                    Text("Not currently connected.")
+                        .foregroundStyle(.secondary)
+                }
+                .padding(14)
+            }
+        }
+        .frame(minWidth: 260, idealWidth: 300)
     }
 
     var serverListPane: some View {
@@ -292,6 +331,28 @@ private extension ContentView {
     var detailPane: some View {
         ZStack {
             mapPane
+        }
+        .safeAreaInset(edge: .top) {
+            if let errorMessage = model.errorMessage, !errorMessage.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text(errorMessage)
+                        .font(.callout)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Dismiss") {
+                        model.errorMessage = nil
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+            }
         }
         .safeAreaInset(edge: .bottom) {
             if let region = model.selectedRegion {

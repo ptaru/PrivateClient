@@ -81,7 +81,7 @@
 		7A441A3CEFA601503F9492EF /* Tunnel.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Tunnel.plist; sourceTree = "<group>"; };
 		89158D6612C4312773F3641C /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		8D55C26B6AEBD6D4DB6D910A /* PIAAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PIAAPIClient.swift; sourceTree = "<group>"; };
-		AF05B34226FA33E6747AA86F /* ca.rsa.4096.crt */ = {isa = PBXFileReference; path = ca.rsa.4096.crt; sourceTree = "<group>"; };
+		AF05B34226FA33E6747AA86F /* ca.rsa.4096.crt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ca.rsa.4096.crt; sourceTree = "<group>"; };
 		AFA6DCF77CEDDCB7732E3F1D /* PIACredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PIACredentialStore.swift; sourceTree = "<group>"; };
 		BBBCC7BAA97AB2D7C5AC17D8 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
 		CAB92151938BFED294644D96 /* PIAModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PIAModels.swift; sourceTree = "<group>"; };
@@ -270,7 +270,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					51CE4AE84E0D19A5D346464E = {
 						DevelopmentTeam = CM6PR6R3U2;
@@ -384,6 +384,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -415,10 +416,12 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = CM6PR6R3U2;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -439,6 +442,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -449,6 +453,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -480,10 +485,12 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = CM6PR6R3U2;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -497,6 +504,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -510,6 +518,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = PrivateClient/App.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -522,6 +531,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient;
 				PRODUCT_NAME = PrivateClient;
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -531,6 +541,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PrivateClientTunnel/Tunnel.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClientTunnel/Tunnel.plist;
@@ -542,6 +553,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient.tunnel;
 				PRODUCT_NAME = PrivateClientTunnel;
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};
@@ -554,6 +566,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = PrivateClient/App.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -566,6 +579,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient;
 				PRODUCT_NAME = PrivateClient;
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -575,6 +589,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PrivateClientTunnel/Tunnel.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClientTunnel/Tunnel.plist;
@@ -586,6 +601,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				PRODUCT_BUNDLE_IDENTIFIER = uk.tarun.PrivateClient.tunnel;
 				PRODUCT_NAME = PrivateClientTunnel;
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};
@@ -596,6 +612,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -614,6 +631,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
