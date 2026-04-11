@@ -186,12 +186,17 @@ private extension ContentView {
     }
 
     func sidebarStatusCard(for region: PIARegion) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("CONNECTED")
-                        .font(.system(size: 10, weight: .black))
-                        .foregroundStyle(.green)
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 6, height: 6)
+                        Text("CONNECTED")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.green)
+                    }
                     Text(region.name)
                         .font(.headline)
                         .lineLimit(1)
@@ -207,13 +212,14 @@ private extension ContentView {
                 Spacer()
                 Text(model.connectedTransport?.displayName ?? "Unknown")
             }
-            .font(.caption2.monospacedDigit())
+            .font(.system(size: 10, design: .monospaced))
             .foregroundStyle(.secondary)
             
             Button(role: .destructive) {
                 Task { await model.disconnect(using: tunnel) }
             } label: {
                 Text("Disconnect")
+                    .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -221,8 +227,12 @@ private extension ContentView {
             .controlSize(.small)
         }
         .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .padding(8)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(.white.opacity(0.1), lineWidth: 0.5)
+        )
+        .padding(12)
     }
 
     var serverListPane: some View {
@@ -297,6 +307,24 @@ private extension ContentView {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    var protocolPicker: some View {
+        Picker("Protocol", selection: $model.selectedTransport) {
+            ForEach(VPNTransport.allCases) { transport in
+                Text(transport.displayName).tag(transport)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize(horizontal: true, vertical: false)
+        .padding(4)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(.white.opacity(0.1), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+    }
+
     var mapPane: some View {
         Map(position: $mapPosition) {
             ForEach(mapRegions) { mapRegion in
@@ -322,28 +350,42 @@ private extension ContentView {
         let isActuallyConnected = model.sessionStatus == .connected && model.connectedRegion?.id == region.id
         let isBusy = model.isBusy
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(isActuallyConnected ? Color.green : Color.secondary)
-                    .frame(width: 8, height: 8)
-                Text(isActuallyConnected ? "Connected to \(region.name)" : region.name)
-                    .font(.headline)
-                Spacer()
-                if isActuallyConnected {
-                    Text(connectionDurationLabel)
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(.secondary)
+        return VStack(spacing: 16) {
+            Picker("Protocol", selection: $model.selectedTransport) {
+                ForEach(VPNTransport.allCases) { transport in
+                    Text(transport.displayName).tag(transport)
                 }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize(horizontal: true, vertical: false)
 
-            HStack(spacing: 10) {
-                Picker("Protocol", selection: $model.selectedTransport) {
-                    ForEach(VPNTransport.allCases) { transport in
-                        Text(transport.displayName).tag(transport)
+            HStack(spacing: 24) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(region.country.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                    
+                    Text(region.name)
+                        .font(.headline)
+                        .lineLimit(1)
+                    
+                    if isActuallyConnected {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(.green)
+                                .frame(width: 6, height: 6)
+                            Text(connectionDurationLabel)
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text("Ready to connect")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .pickerStyle(.segmented)
+                .frame(minWidth: 140, alignment: .leading)
 
                 Button {
                     if isActuallyConnected {
@@ -352,23 +394,33 @@ private extension ContentView {
                         Task { await model.connect(using: tunnel) }
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         if isBusy {
                             ProgressView()
                                 .controlSize(.small)
+                        } else {
+                            Image(systemName: "power")
+                                .font(.headline)
                         }
                         Text(isActuallyConnected ? "Disconnect" : "Connect")
-                            .fontWeight(.semibold)
+                            .fontWeight(.bold)
                     }
-                    .frame(minWidth: 120)
+                    .frame(minWidth: 100)
+                    .padding(.vertical, 8)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(isActuallyConnected ? .red : .green)
+                .clipShape(Capsule())
                 .disabled((!model.canConnect && !isActuallyConnected) || isBusy)
             }
         }
-        .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(.white.opacity(0.1), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
     }
 
     func statusCard(for region: PIARegion) -> some View {
