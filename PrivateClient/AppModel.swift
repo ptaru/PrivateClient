@@ -2,7 +2,6 @@ import Foundation
 import NetworkExtension
 import Observation
 import Partout
-import CoreLocation
 
 @MainActor
 @Observable
@@ -13,6 +12,7 @@ final class AppModel: NSObject {
     var regions: [PIARegion] = []
     var selectedRegionID: String?
     var selectedTransport: VPNTransport = .wireGuard
+    var regionLatenciesMs: [String: Double] = [:]
     var connectedRegionID: String?
     var connectedTransport: VPNTransport?
     var sessionStatus: SessionStatus = .signedOut
@@ -26,21 +26,23 @@ final class AppModel: NSObject {
     private let apiClient: PIAAPIClientProtocol
     private let credentialStore: PIACredentialStore
     private let profileBuilder: PIAProfileBuilder
-    private let locationManager = CLLocationManager()
+    private let regionAutoSelector: RegionAutoSelecting
+    private var regionLatenciesByTransport: [VPNTransport: [String: Double]] = [:]
+    private var latencyRefreshTask: Task<Void, Never>?
 
     init(
         apiClient: PIAAPIClientProtocol = PIAAPIClient(),
         credentialStore: PIACredentialStore = KeychainPIACredentialStore(),
-        profileBuilder: PIAProfileBuilder? = nil
+        profileBuilder: PIAProfileBuilder? = nil,
+        regionAutoSelector: RegionAutoSelecting = LatencyBasedRegionAutoSelector()
     ) {
         self.apiClient = apiClient
         self.credentialStore = credentialStore
         let certificate = (try? String(contentsOf: Self.certificateURL, encoding: .utf8)) ?? ""
         self.profileBuilder = profileBuilder ?? PIAProfileBuilder(certificatePEM: certificate)
+        self.regionAutoSelector = regionAutoSelector
 
         super.init()
-        locationManager.delegate = self
-        locationManager.requestWhenInUseAuthorization()
 
         Task {
             await bootstrap()
@@ -146,6 +148,8 @@ final class AppModel: NSObject {
     }
 
     func signOut(using tunnel: TunnelObservable) async {
+        latencyRefreshTask?.cancel()
+        latencyRefreshTask = nil
         if let currentProfileID {
             isExpectingDisconnect = true
             do {
@@ -166,6 +170,8 @@ final class AppModel: NSObject {
         connectedRegionID = nil
         connectedTransport = nil
         regions = []
+        regionLatenciesMs = [:]
+        regionLatenciesByTransport = [:]
         selectedRegionID = nil
         errorMessage = nil
         logLines = []
@@ -337,6 +343,39 @@ final class AppModel: NSObject {
         logLines.insert("[\(timestamp)] \(line)", at: 0)
         logLines = Array(logLines.prefix(200))
     }
+
+    func refreshLatencyMeasurements() {
+        guard !regions.isEmpty else {
+            latencyRefreshTask?.cancel()
+            latencyRefreshTask = nil
+            regionLatenciesMs = [:]
+            return
+        }
+
+        let transport = selectedTransport
+        if let cached = cachedLatencies(for: transport, regions: regions), !cached.isEmpty {
+            regionLatenciesMs = cached
+        } else {
+            regionLatenciesMs = [:]
+        }
+
+        startLatencyRefresh(
+            for: transport,
+            regionsSnapshot: regions,
+            autoSelectIfCurrentSelection: nil
+        )
+    }
+
+    func latencyText(for region: PIARegion) -> String? {
+        latencyText(for: region.selectionID)
+    }
+
+    func latencyText(for selectionID: String) -> String? {
+        guard let latency = regionLatenciesMs[selectionID] else {
+            return nil
+        }
+        return "\(Int(latency.rounded()))ms"
+    }
 }
 
 private extension Error {
@@ -416,33 +455,102 @@ private extension AppModel {
     func loadRegions() async throws {
         let regions = try await apiClient.fetchRegions()
         self.regions = regions.filter { $0.offline != true }
-        
-        // Only set a default if we don't have a selection, or if the selection is no longer valid
+        let transport = selectedTransport
+        let cached = cachedLatencies(for: transport, regions: self.regions)
+        regionLatenciesMs = cached ?? [:]
+
+        // Only set a default if we don't have a selection, or if the selection is no longer valid.
+        let fallbackSelectionID: String?
         if selectedRegionID == nil {
-            if let userLocation = locationManager.location {
-                selectClosestRegion(to: userLocation)
+            if let fastestRegionID = regionLatenciesMs.min(by: { $0.value < $1.value })?.key {
+                selectedRegionID = fastestRegionID
+                if let region = self.regions.first(where: { $0.selectionID == fastestRegionID }) {
+                    appendLog("Auto-selected lowest latency region: \(region.name).")
+                }
             }
 
             if selectedRegionID == nil {
                 selectedRegionID = self.regions.first?.selectionID
             }
+            fallbackSelectionID = selectedRegionID
         } else if !self.regions.contains(where: { $0.selectionID == selectedRegionID }) {
-            // Check if it's the connected region, if so keep it even if not in current list (rare)
+            // Check if it's the connected region, if so keep it even if not in current list (rare).
             if sessionStatus != .connected {
-                selectedRegionID = self.regions.first?.selectionID
+                selectedRegionID = regionLatenciesMs.min(by: { $0.value < $1.value })?.key
+                    ?? self.regions.first?.selectionID
             }
+            fallbackSelectionID = selectedRegionID
+        } else {
+            fallbackSelectionID = nil
         }
+
+        startLatencyRefresh(
+            for: transport,
+            regionsSnapshot: self.regions,
+            autoSelectIfCurrentSelection: fallbackSelectionID
+        )
     }
 
-    private func selectClosestRegion(to userLocation: CLLocation) {
-        selectedRegionID = self.regions
-            .compactMap { region -> (String, Double)? in
-                guard let coord = RegionCoordinateResolver.coordinate(for: region) else { return nil }
-                let distance = userLocation.distance(from: CLLocation(latitude: coord.latitude, longitude: coord.longitude))
-                return (region.selectionID, distance)
+    func cachedLatencies(
+        for transport: VPNTransport,
+        regions: [PIARegion]
+    ) -> [String: Double]? {
+        guard let cached = regionLatenciesByTransport[transport], !cached.isEmpty else {
+            return nil
+        }
+        let validIDs = Set(regions.map(\.selectionID))
+        return cached.filter { validIDs.contains($0.key) }
+    }
+
+    func startLatencyRefresh(
+        for transport: VPNTransport,
+        regionsSnapshot: [PIARegion],
+        autoSelectIfCurrentSelection selectionID: String?
+    ) {
+        latencyRefreshTask?.cancel()
+        guard !regionsSnapshot.isEmpty else {
+            return
+        }
+
+        let selector = regionAutoSelector
+        latencyRefreshTask = Task(priority: .utility) {
+            let measured = await selector.measureLatencies(
+                from: regionsSnapshot,
+                transport: transport
+            )
+            guard !Task.isCancelled else {
+                return
             }
-            .min(by: { $0.1 < $1.1 })?
-            .0
+
+            await MainActor.run {
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                regionLatenciesByTransport[transport] = measured
+                if selectedTransport == transport {
+                    regionLatenciesMs = measured
+                }
+
+                guard let selectionID else {
+                    return
+                }
+                guard selectedRegionID == selectionID else {
+                    return
+                }
+                guard let fastest = measured.min(by: { $0.value < $1.value })?.key else {
+                    return
+                }
+                guard fastest != selectedRegionID else {
+                    return
+                }
+
+                selectedRegionID = fastest
+                if let region = regions.first(where: { $0.selectionID == fastest }) {
+                    appendLog("Auto-selected lowest latency region: \(region.name).")
+                }
+            }
+        }
     }
 
     func validToken() async throws -> PIAAuthToken {
@@ -570,37 +678,5 @@ private struct PIAWireGuardAuthenticator {
             certificatePEM: certificatePEM,
             publicKey: try PIAPrivateKeyGenerator.publicKey(for: privateKey)
         )
-    }
-}
-
-extension AppModel: CLLocationManagerDelegate {
-    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status = manager.authorizationStatus
-        let location = manager.location
-        Task { @MainActor in
-            switch status {
-            case .authorizedAlways, .authorizedWhenInUse:
-                if selectedRegionID == nil, let location {
-                    selectClosestRegion(to: location)
-                }
-            default:
-                break
-            }
-        }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.first else { return }
-        Task { @MainActor in
-            if selectedRegionID == nil {
-                selectClosestRegion(to: location)
-            }
-        }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in
-            appendLog("Location manager failed: \(error.localizedDescription)")
-        }
     }
 }

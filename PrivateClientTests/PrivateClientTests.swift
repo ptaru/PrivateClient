@@ -2,6 +2,115 @@ import XCTest
 @testable import PrivateClient
 
 final class PrivateClientTests: XCTestCase {
+    func testLatencyAutoSelectorPrefersLowestMeasuredLatency() async {
+        let fastestRegion = PIARegion(
+            id: "uk_london",
+            name: "UK London",
+            country: "GB",
+            autoRegion: nil,
+            dns: "10.0.0.243",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: .init(
+                meta: [],
+                ovpntcp: [],
+                ovpnudp: [],
+                wg: [.init(ip: "1.1.1.1", cn: "uk-wg", van: nil)]
+            )
+        )
+        let slowerRegion = PIARegion(
+            id: "us_new_york",
+            name: "US New York",
+            country: "US",
+            autoRegion: nil,
+            dns: "10.0.0.242",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: .init(
+                meta: [],
+                ovpntcp: [],
+                ovpnudp: [],
+                wg: [.init(ip: "2.2.2.2", cn: "us-wg", van: nil)]
+            )
+        )
+
+        let selector = LatencyBasedRegionAutoSelector(
+            latencyMeasurer: StubLatencyMeasurer(latenciesByIP: [
+                "1.1.1.1": 14.2,
+                "2.2.2.2": 88.7
+            ])
+        )
+
+        let selection = await selector.selectRegionID(
+            from: [slowerRegion, fastestRegion],
+            transport: .wireGuard
+        )
+
+        XCTAssertEqual(selection, fastestRegion.selectionID)
+    }
+
+    func testLatencyAutoSelectorIgnoresRegionsWithoutUsableLatency() async {
+        let reachableRegion = PIARegion(
+            id: "uk_london",
+            name: "UK London",
+            country: "GB",
+            autoRegion: nil,
+            dns: "10.0.0.243",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: .init(
+                meta: [],
+                ovpntcp: [],
+                ovpnudp: [.init(ip: "3.3.3.3", cn: "uk-udp", van: nil)],
+                wg: []
+            )
+        )
+        let unreachableRegion = PIARegion(
+            id: "us_new_york",
+            name: "US New York",
+            country: "US",
+            autoRegion: nil,
+            dns: "10.0.0.242",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: .init(
+                meta: [],
+                ovpntcp: [],
+                ovpnudp: [.init(ip: "4.4.4.4", cn: "us-udp", van: nil)],
+                wg: []
+            )
+        )
+
+        let selector = LatencyBasedRegionAutoSelector(
+            latencyMeasurer: StubLatencyMeasurer(latenciesByIP: [
+                "3.3.3.3": 22.4
+            ])
+        )
+
+        let selection = await selector.selectRegionID(
+            from: [unreachableRegion, reachableRegion],
+            transport: .openVPNUDP
+        )
+
+        XCTAssertEqual(selection, reachableRegion.selectionID)
+    }
+
+    func testPingParserReadsSummaryLatency() {
+        let output = """
+        PING 1.1.1.1 (1.1.1.1): 56 data bytes
+
+        --- 1.1.1.1 ping statistics ---
+        1 packets transmitted, 1 packets received, 0.0% packet loss
+        round-trip min/avg/max/stddev = 14.254/14.254/14.254/0.000 ms
+        """
+
+        XCTAssertEqual(ICMPPingLatencyMeasurer.parseLatency(from: output) ?? 0, 14.254, accuracy: 0.001)
+    }
+
     func testServerListDecodingUsesFirstLine() throws {
         let payload = """
         {"groups":{},"regions":[{"id":"uk","name":"United Kingdom","country":"GB","auto_region":true,"dns":"uk.privacy.network","port_forward":true,"geo":false,"offline":false,"servers":{"meta":[{"ip":"1.1.1.1","cn":"uk-meta"}],"ovpntcp":[{"ip":"2.2.2.2","cn":"uk-tcp","van":true}],"ovpnudp":[{"ip":"3.3.3.3","cn":"uk-udp","van":true}],"wg":[{"ip":"4.4.4.4","cn":"uk-wg"}]}}]}
@@ -137,5 +246,13 @@ final class PrivateClientTests: XCTestCase {
 
         XCTAssertEqual(idA, idB)
         XCTAssertEqual(idA, PrivateClientConfiguration.tunnelProfileIdentifier)
+    }
+}
+
+private struct StubLatencyMeasurer: EndpointLatencyMeasuring {
+    let latenciesByIP: [String: Double]
+
+    func measureLatency(to ipAddress: String, timeoutMilliseconds: Int) async -> Double? {
+        latenciesByIP[ipAddress]
     }
 }

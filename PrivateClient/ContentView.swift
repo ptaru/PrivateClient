@@ -219,6 +219,9 @@ private extension ContentView {
                 )
             }
         }
+        .onChange(of: model.selectedTransport) { _, _ in
+            model.refreshLatencyMeasurements()
+        }
     }
 
     func sidebarStatusCard(for region: PIARegion) -> some View {
@@ -496,9 +499,16 @@ private extension ContentView {
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
                     } else {
-                        Text("Ready to connect")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            Text("Ready to connect")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            if let latency = model.latencyText(for: region) {
+                                Text(latency)
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
                 .frame(minWidth: 140, alignment: .leading)
@@ -770,6 +780,10 @@ private extension ContentView {
                     Image(systemName: "arrow.up.right.square")
                         .help("Port Forwarding available")
                 }
+                if let latency = model.latencyText(for: region) {
+                    Text(latency)
+                        .font(.system(size: 10, design: .monospaced))
+                }
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
@@ -799,6 +813,10 @@ private extension ContentView {
                 if region.portForward == true {
                     Image(systemName: "arrow.up.right.square")
                         .help("Port Forwarding available")
+                }
+                if let latency = model.latencyText(for: region) {
+                    Text(latency)
+                        .font(.system(size: 10, design: .monospaced))
                 }
             }
             .font(.caption)

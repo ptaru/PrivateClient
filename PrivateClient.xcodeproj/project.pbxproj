@@ -18,6 +18,8 @@
 		58AAE1E7C78270D3D323906E /* PrivateClientTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3986B76B8BC8E225AC09FAB2 /* PrivateClientTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		62D412FEE00F0BD83F310895 /* PIAModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB92151938BFED294644D96 /* PIAModels.swift */; };
 		78BD2182399C82A2C2C993A9 /* PIAAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D55C26B6AEBD6D4DB6D910A /* PIAAPIClient.swift */; };
+		7DA83535164ABBF5984F07EA /* LatencyBasedRegionAutoSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16B07961188A4294C26E408D /* LatencyBasedRegionAutoSelector.swift */; };
+		925056D3CC19AF99C7FF979F /* LatencyBasedRegionAutoSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16B07961188A4294C26E408D /* LatencyBasedRegionAutoSelector.swift */; };
 		9A227133941C875873B68442 /* ca.rsa.4096.crt in Resources */ = {isa = PBXBuildFile; fileRef = AF05B34226FA33E6747AA86F /* ca.rsa.4096.crt */; };
 		A95A5C9D50525A5A66AD4B17 /* PIAAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D55C26B6AEBD6D4DB6D910A /* PIAAPIClient.swift */; };
 		B6B74D7541415A309CCAFBD3 /* partout in Frameworks */ = {isa = PBXBuildFile; productRef = E9E99EA52F60C0275499D0A3 /* partout */; };
@@ -70,6 +72,7 @@
 		09ACD9F57904B2AE000D0370 /* TunnelSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelSupport.swift; sourceTree = "<group>"; };
 		14B74237AFB52FE2C3B65E96 /* PrivateClientTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrivateClientTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1655127189B0BAEFC13863BB /* RegionCoordinates.generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionCoordinates.generated.swift; sourceTree = "<group>"; };
+		16B07961188A4294C26E408D /* LatencyBasedRegionAutoSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatencyBasedRegionAutoSelector.swift; sourceTree = "<group>"; };
 		1BEB8E5D69FF78145E983326 /* RegionCoordinateResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionCoordinateResolver.swift; sourceTree = "<group>"; };
 		1C7206D30C388C2EB614495B /* Tunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tunnel.entitlements; sourceTree = "<group>"; };
 		3986B76B8BC8E225AC09FAB2 /* PrivateClientTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PrivateClientTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -169,6 +172,7 @@
 		DB9DB7A65E8A4F22BDFA2208 /* PrivateClientShared */ = {
 			isa = PBXGroup;
 			children = (
+				16B07961188A4294C26E408D /* LatencyBasedRegionAutoSelector.swift */,
 				8D55C26B6AEBD6D4DB6D910A /* PIAAPIClient.swift */,
 				AFA6DCF77CEDDCB7732E3F1D /* PIACredentialStore.swift */,
 				CAB92151938BFED294644D96 /* PIAModels.swift */,
@@ -328,6 +332,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				925056D3CC19AF99C7FF979F /* LatencyBasedRegionAutoSelector.swift in Sources */,
 				A95A5C9D50525A5A66AD4B17 /* PIAAPIClient.swift in Sources */,
 				01E0F64A234240E7C787E1FC /* PIACredentialStore.swift in Sources */,
 				62D412FEE00F0BD83F310895 /* PIAModels.swift in Sources */,
@@ -345,6 +350,7 @@
 				414E253061E9B194CDFE4E1F /* AppModel.swift in Sources */,
 				4B60E22301FC971C3A09B91F /* AppSupport.swift in Sources */,
 				D09B5392FC502814E03D9A4B /* ContentView.swift in Sources */,
+				7DA83535164ABBF5984F07EA /* LatencyBasedRegionAutoSelector.swift in Sources */,
 				78BD2182399C82A2C2C993A9 /* PIAAPIClient.swift in Sources */,
 				EA15C87DA1D8B6289248F881 /* PIACredentialStore.swift in Sources */,
 				1370852304D2E87A7F901526 /* PIAModels.swift in Sources */,
@@ -521,16 +527,6 @@
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
-				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
-				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
-				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
-				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
-				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClient/App.plist;
@@ -579,16 +575,6 @@
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
-				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
-				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
-				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
-				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
-				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PrivateClient/App.plist;
