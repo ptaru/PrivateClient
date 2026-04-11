@@ -83,7 +83,7 @@ private extension ContentView {
     var loginView: some View {
         VStack(spacing: 32) {
             VStack(spacing: 12) {
-                Image(systemName: "shield.lefthalf.filled")
+                Image(systemName: "lock.shield")
                     .font(.system(size: 80))
                     .foregroundStyle(.blue.gradient)
                 
@@ -249,7 +249,7 @@ private extension ContentView {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "shield.checkered")
+                Image(systemName: "lock.shield")
                     .font(.title2)
                     .foregroundStyle(.green.gradient)
             }
@@ -563,7 +563,7 @@ private extension ContentView {
                 
                 Spacer()
                 
-                Image(systemName: isActuallyConnected ? "shield.checkered" : "shield")
+                Image(systemName: isActuallyConnected ? "lock.shield" : "shield")
                     .font(.system(size: 72))
                     .foregroundStyle(isActuallyConnected ? Color.green.gradient : Color.secondary.gradient)
             }

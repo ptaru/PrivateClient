@@ -2,10 +2,11 @@ import Foundation
 import NetworkExtension
 import Observation
 import Partout
+import CoreLocation
 
 @MainActor
 @Observable
-final class AppModel {
+final class AppModel: NSObject {
     var username = ""
     var password = ""
     var searchText = ""
@@ -25,6 +26,7 @@ final class AppModel {
     private let apiClient: PIAAPIClientProtocol
     private let credentialStore: PIACredentialStore
     private let profileBuilder: PIAProfileBuilder
+    private let locationManager = CLLocationManager()
 
     init(
         apiClient: PIAAPIClientProtocol = PIAAPIClient(),
@@ -35,6 +37,10 @@ final class AppModel {
         self.credentialStore = credentialStore
         let certificate = (try? String(contentsOf: Self.certificateURL, encoding: .utf8)) ?? ""
         self.profileBuilder = profileBuilder ?? PIAProfileBuilder(certificatePEM: certificate)
+
+        super.init()
+        locationManager.delegate = self
+        locationManager.requestWhenInUseAuthorization()
 
         Task {
             await bootstrap()
@@ -413,13 +419,30 @@ private extension AppModel {
         
         // Only set a default if we don't have a selection, or if the selection is no longer valid
         if selectedRegionID == nil {
-            selectedRegionID = self.regions.first?.selectionID
+            if let userLocation = locationManager.location {
+                selectClosestRegion(to: userLocation)
+            }
+
+            if selectedRegionID == nil {
+                selectedRegionID = self.regions.first?.selectionID
+            }
         } else if !self.regions.contains(where: { $0.selectionID == selectedRegionID }) {
             // Check if it's the connected region, if so keep it even if not in current list (rare)
             if sessionStatus != .connected {
                 selectedRegionID = self.regions.first?.selectionID
             }
         }
+    }
+
+    private func selectClosestRegion(to userLocation: CLLocation) {
+        selectedRegionID = self.regions
+            .compactMap { region -> (String, Double)? in
+                guard let coord = RegionCoordinateResolver.coordinate(for: region) else { return nil }
+                let distance = userLocation.distance(from: CLLocation(latitude: coord.latitude, longitude: coord.longitude))
+                return (region.selectionID, distance)
+            }
+            .min(by: { $0.1 < $1.1 })?
+            .0
     }
 
     func validToken() async throws -> PIAAuthToken {
@@ -547,5 +570,28 @@ private struct PIAWireGuardAuthenticator {
             certificatePEM: certificatePEM,
             publicKey: try PIAPrivateKeyGenerator.publicKey(for: privateKey)
         )
+    }
+}
+
+extension AppModel: CLLocationManagerDelegate {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            if selectedRegionID == nil, let location = manager.location {
+                selectClosestRegion(to: location)
+            }
+        default:
+            break
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        if selectedRegionID == nil, let location = locations.first {
+            selectClosestRegion(to: location)
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        appendLog("Location manager failed: \(error.localizedDescription)")
     }
 }
