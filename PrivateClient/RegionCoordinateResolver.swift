@@ -53,7 +53,10 @@ private extension RegionCoordinateResolver {
         "au_adelaide-pf": .init(latitude: -34.9285, longitude: 138.6007),
         "au_brisbane-pf": .init(latitude: -27.4698, longitude: 153.0251),
         "aus_perth": .init(latitude: -31.9523, longitude: 115.8613),
-        "au_australia-so": .init(latitude: -33.8688, longitude: 151.2093)
+        "au_australia-so": .init(latitude: -35.2700, longitude: 149.1300), // Canberra
+        "italy_2": .init(latitude: 41.9000, longitude: 12.4800), // Rome
+        "us-streaming": .init(latitude: 38.9072, longitude: -77.0369), // Washington DC
+        "uk_2": .init(latitude: 52.4862, longitude: -1.8904) // Birmingham
     ]
 
     static let cityCenters: [String: CLLocationCoordinate2D] = [
