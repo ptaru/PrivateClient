@@ -21,9 +21,6 @@ struct ContentView: View {
     private var columnVisibility: NavigationSplitViewVisibility = .automatic
 
     @State
-    private var isStatusPopoverVisible = false
-
-    @State
     private var expandedCountries: Set<String> = []
 
     @State
@@ -176,15 +173,12 @@ private extension ContentView {
 
                         if columnVisibility == .detailOnly {
                             Button {
-                                isStatusPopoverVisible.toggle()
+                                selectConnectedRegion()
                             } label: {
                                 statusBadge
                             }
                             .buttonStyle(.plain)
                             .disabled(model.connectedRegion == nil)
-                            .popover(isPresented: $isStatusPopoverVisible, arrowEdge: .top) {
-                                statusPopoverContent
-                            }
                         }
 
                         Button {
@@ -278,29 +272,6 @@ private extension ContentView {
             .tint(.red)
             .controlSize(.small)
         }
-    }
-
-    var statusPopoverContent: some View {
-        Group {
-            if let connectedRegion = model.connectedRegion {
-                statusCardContent(for: connectedRegion)
-                    .padding(14)
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: 8, height: 8)
-                        Text(model.sessionStatus.label)
-                            .font(.headline)
-                    }
-                    Text("Not currently connected.")
-                        .foregroundStyle(.secondary)
-                }
-                .padding(14)
-            }
-        }
-        .frame(minWidth: 260, idealWidth: 300)
     }
 
     var serverListPane: some View {
@@ -465,8 +436,7 @@ private extension ContentView {
                     .contentShape(Rectangle())
                     .shadow(radius: isEmphasized ? 4 : 2)
                     .onTapGesture {
-                        pendingSidebarScrollSelectionID = mapRegion.region.selectionID
-                        model.selectedRegionID = mapRegion.region.selectionID
+                        selectRegion(mapRegion.region)
                     }
                 }
             }
@@ -495,23 +465,36 @@ private extension ContentView {
 
             HStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(region.flagDisplay)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.secondary)
-                    
-                    Text(region.displayName)
-                        .font(.headline)
-                        .lineLimit(1)
-                    
                     if isActuallyConnected {
                         HStack(spacing: 4) {
                             Circle()
                                 .fill(.green)
                                 .frame(width: 6, height: 6)
-                            Text(connectionDurationLabel)
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                            Text("CONNECTED")
+                                .font(.system(size: 10, weight: .bold))
                         }
+                        .padding(.leading, 3)
+                        .foregroundStyle(.green)
+                    }
+                    
+                    HStack(spacing: 6) {
+                        Text(region.flagDisplay)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.secondary)
+                        Text(region.displayName)
+                            .font(.headline)
+                            .lineLimit(1)
+                    }
+                    
+                    if isActuallyConnected {
+                        HStack(spacing: 10) {
+                            Label(connectionDurationLabel, systemImage: "clock")
+                            Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath.fill")
+                            Text(model.connectedTransport?.displayName ?? "Unknown")
+                        }
+                        .padding(.leading, 1)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
                     } else {
                         Text("Ready to connect")
                             .font(.caption2)
@@ -859,6 +842,19 @@ private extension ContentView {
             return
         }
         expandedCountries.insert(selectedCountryCode.uppercased())
+    }
+
+    func selectConnectedRegion() {
+        guard let connectedRegion = model.connectedRegion else {
+            return
+        }
+
+        selectRegion(connectedRegion)
+    }
+
+    func selectRegion(_ region: PIARegion) {
+        pendingSidebarScrollSelectionID = region.selectionID
+        model.selectedRegionID = region.selectionID
     }
 
 }
