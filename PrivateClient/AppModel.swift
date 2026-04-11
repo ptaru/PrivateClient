@@ -12,6 +12,8 @@ final class AppModel {
     var regions: [PIARegion] = []
     var selectedRegionID: String?
     var selectedTransport: VPNTransport = .wireGuard
+    var connectedRegionID: String?
+    var connectedTransport: VPNTransport?
     var sessionStatus: SessionStatus = .signedOut
     var errorMessage: String?
     var logLines: [String] = []
@@ -40,16 +42,16 @@ final class AppModel {
 
     var selectedRegion: PIARegion? {
         guard let selectedRegionID else {
-            return filteredRegions.first
+            return nil
         }
-        return regions.first(where: { $0.id == selectedRegionID })
+        return regions.first(where: { $0.selectionID == selectedRegionID })
     }
 
     var connectedRegion: PIARegion? {
-        guard sessionStatus == .connected else {
+        guard sessionStatus == .connected, let connectedRegionID else {
             return nil
         }
-        return selectedRegion
+        return regions.first(where: { $0.selectionID == connectedRegionID })
     }
 
     var filteredRegions: [PIARegion] {
@@ -153,6 +155,8 @@ final class AppModel {
         }
 
         currentProfileID = nil
+        connectedRegionID = nil
+        connectedTransport = nil
         regions = []
         selectedRegionID = nil
         errorMessage = nil
@@ -184,6 +188,13 @@ final class AppModel {
         guard let region = selectedRegion else {
             errorMessage = "Select a server region first."
             return
+        }
+
+        if sessionStatus == .connected {
+            appendLog("Switching servers. Disconnecting from current session...")
+            await disconnect(using: tunnel)
+            // Wait a moment for the system to settle
+            try? await Task.sleep(for: .milliseconds(500))
         }
 
         sessionStatus = .connecting
@@ -233,6 +244,8 @@ final class AppModel {
                 currentProfileID = builtProfile.profile.id
             }
 
+            connectedRegionID = region.selectionID
+            connectedTransport = selectedTransport
             sessionStatus = .connected
             appendLog("Connected to \(region.name) using \(selectedTransport.displayName).")
             await refreshLog(using: tunnel)
@@ -255,6 +268,8 @@ final class AppModel {
         do {
             try await tunnel.disconnect(from: currentProfileID)
             self.currentProfileID = nil
+            connectedRegionID = nil
+            connectedTransport = nil
             sessionStatus = .ready
             appendLog("Disconnected from VPN.")
             await refreshLog(using: tunnel)
@@ -270,6 +285,8 @@ final class AppModel {
         switch tunnel.status {
         case .inactive:
             currentProfileID = nil
+            connectedRegionID = nil
+            connectedTransport = nil
             if isAuthenticated, !isBusy, sessionStatus != .ready {
                 sessionStatus = .ready
             }
@@ -330,10 +347,15 @@ private extension AppModel {
     func loadRegions() async throws {
         let regions = try await apiClient.fetchRegions()
         self.regions = regions.filter { $0.offline != true }
+        
+        // Only set a default if we don't have a selection, or if the selection is no longer valid
         if selectedRegionID == nil {
-            selectedRegionID = self.regions.first?.id
-        } else if self.regions.contains(where: { $0.id == selectedRegionID }) == false {
-            selectedRegionID = self.regions.first?.id
+            selectedRegionID = self.regions.first?.selectionID
+        } else if !self.regions.contains(where: { $0.selectionID == selectedRegionID }) {
+            // Check if it's the connected region, if so keep it even if not in current list (rare)
+            if sessionStatus != .connected {
+                selectedRegionID = self.regions.first?.selectionID
+            }
         }
     }
 

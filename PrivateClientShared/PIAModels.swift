@@ -110,6 +110,15 @@ struct PIARegion: Codable, Hashable, Identifiable, Sendable {
         case offline
         case servers
     }
+
+    var selectionID: String {
+        [
+            id,
+            name,
+            country,
+            dns ?? ""
+        ].joined(separator: "::")
+    }
 }
 
 struct PIAAuthToken: Codable, Equatable, Sendable {

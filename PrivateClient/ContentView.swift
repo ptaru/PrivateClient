@@ -183,6 +183,7 @@ private extension ContentView {
             logPane
                 .inspectorColumnWidth(min: 300, ideal: 350, max: 500)
         }
+        .navigationSplitViewStyle(.balanced)
     }
 
     func sidebarStatusCard(for region: PIARegion) -> some View {
@@ -205,7 +206,7 @@ private extension ContentView {
             HStack {
                 Label(connectionDurationLabel, systemImage: "clock")
                 Spacer()
-                Text(model.selectedTransport.displayName)
+                Text(model.connectedTransport?.displayName ?? "Unknown")
             }
             .font(.caption2.monospacedDigit())
             .foregroundStyle(.secondary)
@@ -230,7 +231,7 @@ private extension ContentView {
 
     var serverListPane: some View {
         List(selection: $model.selectedRegionID) {
-            ForEach(model.filteredRegions) { region in
+            ForEach(model.filteredRegions, id: \.selectionID) { region in
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(region.name)
@@ -256,7 +257,7 @@ private extension ContentView {
                     .foregroundStyle(.tertiary)
                 }
                 .padding(.vertical, 6)
-                .tag(region.id)
+                .tag(region.selectionID)
             }
         }
         .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search regions")
@@ -306,12 +307,14 @@ private extension ContentView {
     }
 
     func statusCard(for region: PIARegion) -> some View {
-        VStack(spacing: 24) {
+        let isActuallyConnected = model.sessionStatus == .connected && model.connectedRegion?.id == region.id
+        
+        return VStack(spacing: 24) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(model.sessionStatus == .connected ? "Protected" : "Unprotected")
+                    Text(isActuallyConnected ? "Protected" : "Unprotected")
                         .font(.subheadline.weight(.black))
-                        .foregroundStyle(model.sessionStatus == .connected ? .green : .secondary)
+                        .foregroundStyle(isActuallyConnected ? .green : .secondary)
                         .textCase(.uppercase)
                     
                     Text(region.name)
@@ -324,12 +327,12 @@ private extension ContentView {
                 
                 Spacer()
                 
-                Image(systemName: model.sessionStatus == .connected ? "shield.checkered" : "shield")
+                Image(systemName: isActuallyConnected ? "shield.checkered" : "shield")
                     .font(.system(size: 72))
-                    .foregroundStyle(model.sessionStatus == .connected ? Color.green.gradient : Color.secondary.gradient)
+                    .foregroundStyle(isActuallyConnected ? Color.green.gradient : Color.secondary.gradient)
             }
             
-            if model.sessionStatus == .connected {
+            if isActuallyConnected {
                 Divider()
                 
                 HStack {
@@ -347,7 +350,7 @@ private extension ContentView {
                         Text("Transport")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text(model.selectedTransport.displayName)
+                        Text(model.connectedTransport?.displayName ?? "Unknown")
                             .font(.title2.weight(.semibold))
                     }
                 }
@@ -369,31 +372,34 @@ private extension ContentView {
     }
 
     var connectionControl: some View {
-        Button {
-            if model.sessionStatus == .connected {
+        let isActuallyConnected = model.sessionStatus == .connected && model.connectedRegion?.id == model.selectedRegion?.id
+        let isBusy = model.isBusy
+
+        return Button {
+            if isActuallyConnected {
                 Task { await model.disconnect(using: tunnel) }
             } else {
                 Task { await model.connect(using: tunnel) }
             }
         } label: {
             HStack(spacing: 12) {
-                if model.isBusy {
+                if isBusy {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Image(systemName: model.sessionStatus == .connected ? "power.circle.fill" : "power")
+                    Image(systemName: isActuallyConnected ? "power.circle.fill" : "power")
                         .font(.title)
                 }
                 
-                Text(model.sessionStatus == .connected ? "Disconnect" : "Connect Now")
+                Text(isActuallyConnected ? "Disconnect" : (model.sessionStatus == .connected ? "Switch to Server" : "Connect Now"))
                     .font(.title3.weight(.bold))
             }
             .frame(maxWidth: .infinity)
             .frame(height: 60)
         }
         .buttonStyle(.glassProminent)
-        .tint(model.sessionStatus == .connected ? .red : .blue)
-        .disabled(!model.canConnect && model.sessionStatus != .connected)
+        .tint(isActuallyConnected ? .red : .blue)
+        .disabled(!model.canConnect && !isActuallyConnected)
     }
 
     var logPane: some View {
