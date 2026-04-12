@@ -81,7 +81,6 @@
 		5E15C9EE3BF317ED42C63D35 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		62355CA84880C5E9FC862E97 /* AppSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSupport.swift; sourceTree = "<group>"; };
 		77A9107B8EA229390FCF7611 /* PrivateClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateClientApp.swift; sourceTree = "<group>"; };
-		7A441A3CEFA601503F9492EF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		89158D6612C4312773F3641C /* PrivateClient.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PrivateClient.entitlements; sourceTree = "<group>"; };
 		8D55C26B6AEBD6D4DB6D910A /* PIAAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PIAAPIClient.swift; sourceTree = "<group>"; };
 		AF05B34226FA33E6747AA86F /* ca.rsa.4096.crt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ca.rsa.4096.crt; sourceTree = "<group>"; };
@@ -91,7 +90,6 @@
 		D277AC09B2893D4A64E8C58C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		D920E9C1DD4884D906E8A220 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E97E867D523318F5B1C1882D /* PrivateClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PrivateClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		EB0F4E528A81102EC5E90E3A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		FB1317A04828FE24E33DF2D9 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		FBF698BD2571F1D0B0F5CF37 /* PrivateClientConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateClientConfiguration.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -155,7 +153,6 @@
 			isa = PBXGroup;
 			children = (
 				89158D6612C4312773F3641C /* PrivateClient.entitlements */,
-				EB0F4E528A81102EC5E90E3A /* Info.plist */,
 				5E15C9EE3BF317ED42C63D35 /* AppIcon.icon */,
 				FB1317A04828FE24E33DF2D9 /* AppModel.swift */,
 				62355CA84880C5E9FC862E97 /* AppSupport.swift */,
@@ -187,7 +184,6 @@
 			children = (
 				BBBCC7BAA97AB2D7C5AC17D8 /* PacketTunnelProvider.swift */,
 				1C7206D30C388C2EB614495B /* PrivateClientTunnel.entitlements */,
-				7A441A3CEFA601503F9492EF /* Info.plist */,
 				09ACD9F57904B2AE000D0370 /* TunnelSupport.swift */,
 			);
 			path = PrivateClientTunnel;
@@ -529,7 +525,6 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = PrivateClient/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PrivateClient;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -556,8 +551,8 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = PrivateClientTunnel/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "PrivateClient Tunnel";
+				INFOPLIST_KEY_NSExtension = "{NSExtensionPointIdentifier = com.apple.networkextension.packet-tunnel; NSExtensionPrincipalClass = \"$(PRODUCT_MODULE_NAME).PacketTunnelProvider\"; }";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -587,7 +582,6 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = PrivateClient/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PrivateClient;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -614,8 +608,8 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = PrivateClientTunnel/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "PrivateClient Tunnel";
+				INFOPLIST_KEY_NSExtension = "{NSExtensionPointIdentifier = com.apple.networkextension.packet-tunnel; NSExtensionPrincipalClass = \"$(PRODUCT_MODULE_NAME).PacketTunnelProvider\"; }";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
