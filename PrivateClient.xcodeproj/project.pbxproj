@@ -206,6 +206,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9A0D638D47072A9197867178 /* Build configuration list for PBXNativeTarget "PrivateClientTunnel" */;
 			buildPhases = (
+				F1B832CE5E324B0CAA57E815 /* Generate Tunnel Info.plist */,
 				6514AB066A188E7540CF9D11 /* Sources */,
 				5ED6E52E03329B62B03614DA /* Frameworks */,
 			);
@@ -320,6 +321,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		F1B832CE5E324B0CAA57E815 /* Generate Tunnel Info.plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Tunnel Info.plist";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/PrivateClientTunnel-GeneratedInfo.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n\nOUTPUT_PATH=\"${DERIVED_FILE_DIR}/PrivateClientTunnel-GeneratedInfo.plist\"\n\ncat > \"$OUTPUT_PATH\" <<EOF\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>CFBundleDevelopmentRegion</key>\n\t<string>${DEVELOPMENT_LANGUAGE}</string>\n\t<key>CFBundleExecutable</key>\n\t<string>${EXECUTABLE_NAME}</string>\n\t<key>CFBundleIdentifier</key>\n\t<string>${PRODUCT_BUNDLE_IDENTIFIER}</string>\n\t<key>CFBundleInfoDictionaryVersion</key>\n\t<string>6.0</string>\n\t<key>CFBundleName</key>\n\t<string>${PRODUCT_NAME}</string>\n\t<key>CFBundleDisplayName</key>\n\t<string>PrivateClient Tunnel</string>\n\t<key>CFBundlePackageType</key>\n\t<string>XPC!</string>\n\t<key>CFBundleShortVersionString</key>\n\t<string>${MARKETING_VERSION}</string>\n\t<key>CFBundleVersion</key>\n\t<string>${CURRENT_PROJECT_VERSION}</string>\n\t<key>NSExtension</key>\n\t<dict>\n\t\t<key>NSExtensionPointIdentifier</key>\n\t\t<string>com.apple.networkextension.packet-tunnel</string>\n\t\t<key>NSExtensionPrincipalClass</key>\n\t\t<string>${PRODUCT_MODULE_NAME}.PacketTunnelProvider</string>\n\t</dict>\n</dict>\n</plist>\nEOF\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		6514AB066A188E7540CF9D11 /* Sources */ = {
@@ -550,9 +573,8 @@
 				DEVELOPMENT_TEAM = CM6PR6R3U2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "PrivateClient Tunnel";
-				INFOPLIST_KEY_NSExtension = "{NSExtensionPointIdentifier = com.apple.networkextension.packet-tunnel; NSExtensionPrincipalClass = \"$(PRODUCT_MODULE_NAME).PacketTunnelProvider\"; }";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/PrivateClientTunnel-GeneratedInfo.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -607,9 +629,8 @@
 				DEVELOPMENT_TEAM = CM6PR6R3U2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "PrivateClient Tunnel";
-				INFOPLIST_KEY_NSExtension = "{NSExtensionPointIdentifier = com.apple.networkextension.packet-tunnel; NSExtensionPrincipalClass = \"$(PRODUCT_MODULE_NAME).PacketTunnelProvider\"; }";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/PrivateClientTunnel-GeneratedInfo.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
