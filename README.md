@@ -43,7 +43,6 @@ How this maps in practice:
 - `PrivateClientShared/`: PIA API client, models, profile builder, shared config
 - `PrivateClientTunnel/`: `NEPacketTunnelProvider` + Partout registry/runtime wiring
 - `PrivateClientTests/`: unit tests for decoding, mappings, token/profile rules, latency selector behavior
-- `project.yml`: XcodeGen definition for project generation
 
 ## Architecture Notes
 
@@ -79,9 +78,6 @@ Prerequisites:
 Commands:
 
 ```bash
-# Optional: regenerate Xcode project
-xcodegen generate
-
 # Build
 xcodebuild -scheme PrivateClient -destination 'platform=macOS' build
 
