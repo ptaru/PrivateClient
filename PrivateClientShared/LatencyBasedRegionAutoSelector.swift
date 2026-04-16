@@ -19,8 +19,8 @@ struct LatencyBasedRegionAutoSelector: RegionAutoSelecting {
     init(
         latencyMeasurer: EndpointLatencyMeasuring = TCPConnectLatencyMeasurer(),
         timeoutMilliseconds: Int = 1000,
-        maxConcurrentMeasurements: Int = 16,
-        refinementCandidateCount: Int = 24
+        maxConcurrentMeasurements: Int = 32,
+        refinementCandidateCount: Int = 16
     ) {
         self.latencyMeasurer = latencyMeasurer
         self.timeoutMilliseconds = timeoutMilliseconds

@@ -39,6 +39,9 @@ struct ContentView: View {
     @State
     private var hasAppliedInitialSelectionMapFocus = false
 
+    @State
+    private var compactConnectionPanelRowWidth: CGFloat = 0
+
     private let refreshTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
     private let clockTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
@@ -282,7 +285,9 @@ private extension ContentView {
     }
 
     func statusCardContent(for region: PIARegion) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let supportsPortForward = region.portForward == true
+
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
@@ -293,27 +298,43 @@ private extension ContentView {
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.green)
                     }
-                    Text(region.displayName)
-                        .font(.headline)
-                        .lineLimit(1)
-                    Text(region.flagDisplay)
-                        .font(.subheadline)
+                    .padding(.leading, 3)
+                    HStack(spacing: 6) {
+                        Text(region.flagDisplay)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.secondary)
+                        Text(region.displayName)
+                            .font(.headline)
+                            .lineLimit(1)
+                    }
+
+                    HStack(spacing: 10) {
+                        Label(connectionDurationLabel, systemImage: "clock")
+                        Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath.fill")
+                        Text(model.connectedTransport?.displayName ?? "Unknown")
+                    }
+                    .padding(.leading, 1)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                    if model.shouldRequestPortForward && supportsPortForward {
+                        HStack(spacing: 6) {
+                            Image(systemName: "point.3.connected.trianglepath.dotted")
+                            Text(portForwardStatusText)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        .padding(.leading, 1)
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
                 Image(systemName: "lock.shield")
                     .font(.title2)
                     .foregroundStyle(.green.gradient)
             }
-            
-            HStack {
-                Label(connectionDurationLabel, systemImage: "clock")
-                Spacer()
-                Text(model.connectedTransport?.displayName ?? "Unknown")
-            }
-            .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(.secondary)
-            
+
             Button(role: .destructive) {
                 Task { await model.disconnect(using: tunnel) }
             } label: {
@@ -525,22 +546,19 @@ private extension ContentView {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize(horizontal: true, vertical: false)
-
-            if supportsPortForward {
-                Toggle(isOn: Binding(
-                    get: { model.shouldRequestPortForward },
-                    set: { shouldEnable in
-                        Task { await model.setPortForwardingPreference(shouldEnable) }
-                    }
-                )) {
-                    Text("Forward a port for me")
-                        .font(.subheadline.weight(.semibold))
+            .background(
+                GeometryReader { geometry in
+                    Color.clear
+                        .onAppear {
+                            compactConnectionPanelRowWidth = geometry.size.width
+                        }
+                        .onChange(of: geometry.size.width) { _, newWidth in
+                            compactConnectionPanelRowWidth = newWidth
+                        }
                 }
-                .toggleStyle(.checkbox)
-                .disabled(isBusy)
-            }
+            )
 
-            HStack(spacing: 24) {
+            HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     if isActuallyConnected {
                         HStack(spacing: 4) {
@@ -576,6 +594,7 @@ private extension ContentView {
                             HStack(spacing: 6) {
                                 Image(systemName: "point.3.connected.trianglepath.dotted")
                                 Text(portForwardStatusText)
+                                    .foregroundStyle(.secondary)
                                     .textSelection(.enabled)
                             }
                             .padding(.leading, 1)
@@ -595,7 +614,9 @@ private extension ContentView {
                         }
                     }
                 }
-                .frame(minWidth: 140, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer(minLength: 0)
 
                 Button {
                     if isActuallyConnected {
@@ -622,6 +643,24 @@ private extension ContentView {
                 .clipShape(Capsule())
                 .disabled((!model.canConnect && !isActuallyConnected) || isBusy)
             }
+            .frame(
+                width: compactConnectionPanelRowWidth > 0 ? compactConnectionPanelRowWidth : nil,
+                alignment: .leading
+            )
+
+            if supportsPortForward && !isActuallyConnected {
+                Toggle(isOn: Binding(
+                    get: { model.shouldRequestPortForward },
+                    set: { shouldEnable in
+                        Task { await model.setPortForwardingPreference(shouldEnable) }
+                    }
+                )) {
+                    Text("Forward a port for me")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .toggleStyle(.switch)
+                .disabled(isBusy)
+            }
         }
         .padding(20)
         .glassEffect(in: .rect(cornerRadius: 24))
@@ -629,16 +668,16 @@ private extension ContentView {
 
     var portForwardStatusText: String {
         if let port = model.forwardedPort {
-            return "Forwarded port \(port)"
+            return "Forwarding port \(port)"
         }
         if model.hasPortForwardSetupFailed {
-            return "Port forwarding setup failed"
+            return "Port forwarding failed"
         }
         if model.isPortForwardRequestInProgress {
-            return "Setting up port forwarding…"
+            return "Requesting port…"
         }
         if model.shouldRequestPortForward {
-            return "Setting up port forwarding…"
+            return "Requesting port…"
         }
         return "Forwarded port unavailable"
     }
