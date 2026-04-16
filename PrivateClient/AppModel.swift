@@ -118,7 +118,6 @@ final class AppModel: NSObject {
                 isSignedIn = true
                 sessionStatus = .loadingServers
                 try await loadRegions()
-                await awaitLatencyRefreshCompletion()
                 sessionStatus = .ready
                 isMainInterfaceReady = true
                 appendLog("Restored saved credentials for \(credentials.username).")
@@ -152,7 +151,6 @@ final class AppModel: NSObject {
             isMainInterfaceReady = false
             sessionStatus = .loadingServers
             try await loadRegions()
-            await awaitLatencyRefreshCompletion()
             sessionStatus = .ready
             isMainInterfaceReady = true
             appendLog("Signed in and fetched \(regions.count) regions.")
@@ -401,6 +399,9 @@ final class AppModel: NSObject {
     }
 
     func latencyText(for selectionID: String) -> String? {
+        guard shouldDisplayLatencyMeasurements else {
+            return nil
+        }
         guard let latency = regionLatenciesMs[selectionID] else {
             return nil
         }
@@ -408,7 +409,10 @@ final class AppModel: NSObject {
     }
 
     func latencyValue(for selectionID: String) -> Double? {
-        regionLatenciesMs[selectionID]
+        guard shouldDisplayLatencyMeasurements else {
+            return nil
+        }
+        return regionLatenciesMs[selectionID]
     }
 
     func awaitLatencyRefreshCompletion() async {
@@ -544,6 +548,10 @@ private extension NSError {
 }
 
 private extension AppModel {
+    var shouldDisplayLatencyMeasurements: Bool {
+        !isLatencyRefreshInProgress
+    }
+
     func lowestLatencySelectionID() -> String? {
         let validSelectionIDs = Set(regions.map(\.selectionID))
         return regionLatenciesMs

@@ -115,7 +115,7 @@ private extension ContentView {
                         .controlSize(.regular)
                     Text("Preparing…")
                         .font(.headline)
-                    Text("Fetching regions and measuring latency.")
+                    Text("Fetching regions.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

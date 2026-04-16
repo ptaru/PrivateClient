@@ -14,15 +14,31 @@ struct LatencyBasedRegionAutoSelector: RegionAutoSelecting {
     let latencyMeasurer: EndpointLatencyMeasuring
     let timeoutMilliseconds: Int
     let maxConcurrentMeasurements: Int
+    let refinementCandidateCount: Int
 
     init(
         latencyMeasurer: EndpointLatencyMeasuring = TCPConnectLatencyMeasurer(),
         timeoutMilliseconds: Int = 1000,
-        maxConcurrentMeasurements: Int = 128
+        maxConcurrentMeasurements: Int = 16,
+        refinementCandidateCount: Int = 24
     ) {
         self.latencyMeasurer = latencyMeasurer
         self.timeoutMilliseconds = timeoutMilliseconds
         self.maxConcurrentMeasurements = max(1, maxConcurrentMeasurements)
+        self.refinementCandidateCount = max(0, refinementCandidateCount)
+    }
+
+    init(
+        latencyMeasurer: EndpointLatencyMeasuring = TCPConnectLatencyMeasurer(),
+        timeoutMilliseconds: Int = 1000,
+        maxConcurrentMeasurements: Int = 16
+    ) {
+        self.init(
+            latencyMeasurer: latencyMeasurer,
+            timeoutMilliseconds: timeoutMilliseconds,
+            maxConcurrentMeasurements: maxConcurrentMeasurements,
+            refinementCandidateCount: 24
+        )
     }
 
     func selectRegionID(from regions: [PIARegion], transport: VPNTransport) async -> String? {
@@ -31,17 +47,57 @@ struct LatencyBasedRegionAutoSelector: RegionAutoSelecting {
     }
 
     func measureLatencies(from regions: [PIARegion], transport: VPNTransport) async -> [String: Double] {
-        let candidates = regions.compactMap { region -> (String, String)? in
-            if let endpoint = region.servers.meta.first {
-                return (region.selectionID, endpoint.ip)
-            }
-
-            guard let endpoint = region.servers.endpoint(for: transport) else {
+        let candidatesByRegion = regions.compactMap { region -> RegionLatencyCandidates? in
+            let endpoints = region.servers.endpointsForLatencyMeasurement(using: transport)
+            guard let primaryEndpoint = endpoints.first else {
                 return nil
             }
-            return (region.selectionID, endpoint.ip)
+
+            return RegionLatencyCandidates(
+                regionID: region.selectionID,
+                primaryIP: primaryEndpoint.ip,
+                refinementIPs: Array(endpoints.dropFirst()).map(\.ip)
+            )
         }
 
+        guard !candidatesByRegion.isEmpty else {
+            return [:]
+        }
+
+        let primaryCandidates = candidatesByRegion.map { ($0.regionID, $0.primaryIP) }
+        var latencies = await measureCandidateLatencies(primaryCandidates)
+
+        guard refinementCandidateCount > 0, !latencies.isEmpty else {
+            return latencies
+        }
+
+        let refinementRegionIDs = Set(
+            latencies
+                .sorted(by: { $0.value < $1.value })
+                .prefix(refinementCandidateCount)
+                .map(\.key)
+        )
+
+        let refinementCandidates = candidatesByRegion.flatMap { candidate -> [(String, String)] in
+            guard refinementRegionIDs.contains(candidate.regionID) else {
+                return []
+            }
+            return candidate.refinementIPs.map { (candidate.regionID, $0) }
+        }
+
+        guard !refinementCandidates.isEmpty else {
+            return latencies
+        }
+
+        let refinedLatencies = await measureCandidateLatencies(refinementCandidates)
+        for (regionID, latency) in refinedLatencies {
+            latencies[regionID] = min(latencies[regionID] ?? latency, latency)
+        }
+
+        return latencies
+    }
+
+    private func measureCandidateLatencies(_ candidates: [(String, String)]) async -> [String: Double] {
         guard !candidates.isEmpty else {
             return [:]
         }
@@ -71,19 +127,48 @@ struct LatencyBasedRegionAutoSelector: RegionAutoSelecting {
                     guard let latency = result.1 else {
                         continue
                     }
-                    batchResults[result.0] = latency
+                    batchResults[result.0] = min(batchResults[result.0] ?? latency, latency)
                 }
 
                 return batchResults
             }
 
             for (regionID, latency) in batchLatencies {
-                latencies[regionID] = latency
+                latencies[regionID] = min(latencies[regionID] ?? latency, latency)
             }
-
         }
 
         return latencies
+    }
+}
+
+private struct RegionLatencyCandidates {
+    let regionID: String
+    let primaryIP: String
+    let refinementIPs: [String]
+}
+
+private extension PIARegionServers {
+    func endpointsForLatencyMeasurement(using transport: VPNTransport) -> [PIAServerEndpoint] {
+        let transportEndpoints: [PIAServerEndpoint]
+        switch transport {
+        case .wireGuard:
+            transportEndpoints = wg
+        case .openVPNUDP:
+            transportEndpoints = ovpnudp
+        case .openVPNTCP:
+            transportEndpoints = ovpntcp
+        }
+
+        if !transportEndpoints.isEmpty {
+            return transportEndpoints
+        }
+
+        if !meta.isEmpty {
+            return meta
+        }
+
+        return []
     }
 }
 

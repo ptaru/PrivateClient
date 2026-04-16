@@ -99,7 +99,7 @@ final class PrivateClientTests: XCTestCase {
         XCTAssertEqual(selection, reachableRegion.selectionID)
     }
 
-    func testLatencyAutoSelectorPrefersMetaEndpointWhenAvailable() async {
+    func testLatencyAutoSelectorPrefersTransportEndpointsForSelectedTransport() async {
         let tracker = EndpointSelectionTracker()
         let selector = LatencyBasedRegionAutoSelector(
             latencyMeasurer: TrackingLatencyMeasurer(
@@ -127,8 +127,43 @@ final class PrivateClientTests: XCTestCase {
 
         _ = await selector.measureLatencies(from: [region], transport: .wireGuard)
 
-        let lastIPAddress = await tracker.lastIPAddress()
-        XCTAssertEqual(lastIPAddress, "9.9.9.9")
+        let measuredIPAddresses = await tracker.recordedIPAddresses()
+        XCTAssertEqual(measuredIPAddresses, ["1.1.1.1"])
+    }
+
+    func testLatencyAutoSelectorUsesLowestLatencyAcrossRegionEndpoints() async {
+        let region = PIARegion(
+            id: "uk_london",
+            name: "UK London",
+            country: "GB",
+            autoRegion: nil,
+            dns: "10.0.0.243",
+            portForward: nil,
+            geo: nil,
+            offline: nil,
+            servers: .init(
+                meta: [],
+                ovpntcp: [],
+                ovpnudp: [],
+                wg: [
+                    .init(ip: "11.1.1.1", cn: "uk-wg-1", van: nil),
+                    .init(ip: "22.2.2.2", cn: "uk-wg-2", van: nil),
+                    .init(ip: "33.3.3.3", cn: "uk-wg-3", van: nil)
+                ]
+            )
+        )
+
+        let selector = LatencyBasedRegionAutoSelector(
+            latencyMeasurer: StubLatencyMeasurer(latenciesByIP: [
+                "11.1.1.1": 32.4,
+                "22.2.2.2": 18.7,
+                "33.3.3.3": 24.9
+            ])
+        )
+
+        let measured = await selector.measureLatencies(from: [region], transport: .wireGuard)
+
+        XCTAssertEqual(measured[region.selectionID], 18.7)
     }
 
     func testLatencyAutoSelectorLimitsConcurrentMeasurements() async {
@@ -330,14 +365,14 @@ private actor MeasurementConcurrencyTracker {
 }
 
 private actor EndpointSelectionTracker {
-    private var ipAddress: String?
+    private var ipAddresses: [String] = []
 
     func record(ipAddress: String) {
-        self.ipAddress = ipAddress
+        ipAddresses.append(ipAddress)
     }
 
-    func lastIPAddress() -> String? {
-        ipAddress
+    func recordedIPAddresses() -> [String] {
+        ipAddresses
     }
 }
 
