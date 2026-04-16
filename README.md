@@ -12,6 +12,7 @@ Implemented today:
 - Transport selection: `WireGuard`, `OpenVPN UDP`, `OpenVPN TCP`
 - Connect, disconnect, and in-session server switching
 - Latency measurement and latency-based region ordering
+- Port forwarding
 - Map + sidebar region selection UI
 - Session log viewer (app + tunnel log surface)
 - Menu Bar extra with status, `Quick Connect`, and disconnect
@@ -19,7 +20,6 @@ Implemented today:
 
 Not implemented yet:
 - Kill switch / firewall rules
-- Port-forwarding automation
 - Dedicated IP workflows
 - Favorites and richer connection rules/policies
 
