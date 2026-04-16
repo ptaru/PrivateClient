@@ -435,9 +435,6 @@ final class AppModel: NSObject {
     }
 
     func latencyText(for selectionID: String) -> String? {
-        guard shouldDisplayLatencyMeasurements else {
-            return nil
-        }
         guard let latency = regionLatenciesMs[selectionID] else {
             return nil
         }
@@ -445,9 +442,6 @@ final class AppModel: NSObject {
     }
 
     func latencyValue(for selectionID: String) -> Double? {
-        guard shouldDisplayLatencyMeasurements else {
-            return nil
-        }
         return regionLatenciesMs[selectionID]
     }
 
@@ -607,6 +601,7 @@ private extension AppModel {
     enum UIPreferences {
         static let selectedTransportKey = "ui.selectedTransport"
         static let shouldRequestPortForwardKey = "ui.shouldRequestPortForward"
+        static let latenciesKey = "ui.cachedLatencies"
     }
 
     func restoreUIPreferences() {
@@ -615,6 +610,7 @@ private extension AppModel {
             selectedTransport = storedTransport
         }
         shouldRequestPortForward = preferencesStore.bool(forKey: UIPreferences.shouldRequestPortForwardKey)
+        restoreLatenciesFromDisk()
     }
 
     func saveSelectedTransportPreference() {
@@ -626,6 +622,32 @@ private extension AppModel {
             shouldRequestPortForward,
             forKey: UIPreferences.shouldRequestPortForwardKey
         )
+    }
+
+    func restoreLatenciesFromDisk() {
+        guard let data = preferencesStore.data(forKey: UIPreferences.latenciesKey),
+              let decoded = try? JSONDecoder().decode([String: [String: Double]].self, from: data) else {
+            return
+        }
+
+        var restored: [VPNTransport: [String: Double]] = [:]
+        for (rawTransport, latencies) in decoded {
+            if let transport = VPNTransport(rawValue: rawTransport) {
+                restored[transport] = latencies
+            }
+        }
+        self.regionLatenciesByTransport = restored
+    }
+
+    func saveLatenciesToDisk() {
+        var toEncode: [String: [String: Double]] = [:]
+        for (transport, latencies) in regionLatenciesByTransport {
+            toEncode[transport.rawValue] = latencies
+        }
+
+        if let data = try? JSONEncoder().encode(toEncode) {
+            preferencesStore.set(data, forKey: UIPreferences.latenciesKey)
+        }
     }
 
     var shouldDisplayLatencyMeasurements: Bool {
@@ -720,11 +742,12 @@ private extension AppModel {
                     return
                 }
 
-                regionLatenciesByTransport[transport] = measured
+                self.regionLatenciesByTransport[transport] = measured
                 if selectedTransport == transport {
-                    regionLatenciesMs = measured
+                    self.regionLatenciesMs = measured
                 }
-                isLatencyRefreshInProgress = false
+                self.saveLatenciesToDisk()
+                self.isLatencyRefreshInProgress = false
 
                 guard shouldAutoSelect else {
                     return

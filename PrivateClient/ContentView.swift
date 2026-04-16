@@ -195,9 +195,28 @@ private extension ContentView {
                 .navigationSplitViewColumnWidth(ideal: 300, max: 400)
                 .navigationTitle("Servers")
                 .safeAreaBar(edge: .bottom) {
-                    if let connectedRegion = model.connectedRegion {
-                        sidebarStatusCard(for: connectedRegion)
+                    VStack(spacing: 0) {
+                        if model.isLatencyRefreshInProgress {
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Updating latency…")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .glassEffect(in: .rect(cornerRadius: 18))
+                            .padding(.bottom, model.connectedRegion != nil ? 4 : 10)
+                            .padding(.horizontal, 10)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+
+                        if let connectedRegion = model.connectedRegion {
+                            sidebarStatusCard(for: connectedRegion)
+                        }
                     }
+                    .animation(.snappy, value: model.isLatencyRefreshInProgress)
                 }
         } detail: {
             detailPane
@@ -359,74 +378,73 @@ private extension ContentView {
     }
 
     var serverListPane: some View {
-        Group {
-            if model.isLatencyRefreshInProgress {
-                VStack(spacing: 10) {
-                    ProgressView()
-                    Text("Measuring latency...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollViewReader { proxy in
-                    List(selection: $model.selectedRegionID) {
-                        ForEach(groupedRegions) { group in
-                            if group.isCollapsible {
-                                let isExpanded = isCountryExpanded(group.countryCode)
+        ScrollViewReader { proxy in
+            List(selection: $model.selectedRegionID) {
+                Section {
+                    ForEach(groupedRegions) { group in
+                        if group.isCollapsible {
+                            let isExpanded = isCountryExpanded(group.countryCode)
 
-                                // Country Header Row
-                                HStack(alignment: .center, spacing: 12) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(group.countryName)
-                                            .font(.subheadline.weight(.semibold))
-                                        Text(group.flagDisplay)
-                                            .font(.headline)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    HStack(spacing: 8) {
-                                        Text("\(group.regions.count)")
-                                            .font(.caption.weight(.medium))
-                                            .foregroundStyle(.secondary)
-
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption.weight(.bold))
-                                            .foregroundStyle(.tertiary)
-                                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                                    }
+                            // Country Header Row
+                            HStack(alignment: .center, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(group.countryName)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(group.flagDisplay)
+                                        .font(.headline)
+                                        .foregroundStyle(.secondary)
                                 }
-                                .padding(.vertical, 4)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    withAnimation(.snappy(duration: 0.2)) {
-                                        let normalizedCode = group.countryCode.uppercased()
-                                        if expandedCountries.contains(normalizedCode) {
-                                            expandedCountries.remove(normalizedCode)
-                                        } else {
-                                            expandedCountries.insert(normalizedCode)
-                                            // Auto-select first item when expanding
-                                            if let firstRegion = group.regions.first {
-                                                model.selectedRegionID = firstRegion.selectionID
-                                            }
+
+                                Spacer()
+
+                                HStack(spacing: 8) {
+                                    Text("\(group.regions.count)")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(.secondary)
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(.tertiary)
+                                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    let normalizedCode = group.countryCode.uppercased()
+                                    if expandedCountries.contains(normalizedCode) {
+                                        expandedCountries.remove(normalizedCode)
+                                    } else {
+                                        expandedCountries.insert(normalizedCode)
+                                        // Auto-select first item when expanding
+                                        if let firstRegion = group.regions.first {
+                                            model.selectedRegionID = firstRegion.selectionID
                                         }
                                     }
                                 }
-
-                                if isExpanded {
-                                    ForEach(group.regions, id: \.selectionID) { region in
-                                        groupedRegionRow(region)
-                                            .padding(.leading, 16)
-                                    }
-                                }
-                            } else if let region = group.regions.first {
-                                singleRegionCountryRow(region, countryName: group.countryName)
                             }
+
+                            if isExpanded {
+                                ForEach(group.regions, id: \.selectionID) { region in
+                                    groupedRegionRow(region)
+                                        .padding(.leading, 16)
+                                }
+                            }
+                        } else if let region = group.regions.first {
+                            singleRegionCountryRow(region, countryName: group.countryName)
                         }
                     }
-                    .transaction { transaction in
+                } header: {
+                    Text("\(model.regions.count) regions available")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .id("top-anchor")
+                }
+            }
+            .transaction { transaction in
+
                         // Avoid subtle scroll-jitter when latency updates cause frequent reordering.
                         transaction.animation = nil
                     }
@@ -446,6 +464,16 @@ private extension ContentView {
                     }
                     .onChange(of: model.searchText) { _, _ in
                         expandSelectionGroupIfNeeded()
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo("top-anchor", anchor: .top)
+                        }
+                    }
+                    .onChange(of: model.isLatencyRefreshInProgress) { _, isRefreshing in
+                        if !isRefreshing {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                proxy.scrollTo("top-anchor", anchor: .top)
+                            }
+                        }
                     }
                     .onAppear {
                         expandSelectionGroupIfNeeded()
@@ -454,9 +482,6 @@ private extension ContentView {
                     .listStyle(.sidebar)
                 }
             }
-        }
-    }
-
     var detailPane: some View {
         ZStack(alignment: .bottom) {
             mapPane
