@@ -2,7 +2,7 @@
 
 `PrivateClient` is an unofficial macOS client for Private Internet Access (PIA), built with SwiftUI, Network Extension, and [Partout](https://github.com/partout-io/partout).
 
-<img width="1252" height="834" alt="Screenshot 2026-04-12 at 12 09 52" src="https://github.com/user-attachments/assets/7febe36e-af5c-4f35-88c2-e9422321c3da" />
+<img width="1315" height="890" alt="579515882-cedb728c-8a13-4a35-9cf6-508d972658d6" src="https://github.com/user-attachments/assets/bfc4b317-2e9a-4a49-b120-23c4e4519bf9" />
 
 ## Current State
 
