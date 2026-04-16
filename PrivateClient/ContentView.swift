@@ -204,6 +204,16 @@ private extension ContentView {
                 .navigationSplitViewColumnWidth(ideal: 600)
                 .navigationTitle("PrivateClient")
                 .toolbar {
+                    ToolbarItem(placement: .navigation) {
+                        Button {
+                            Task { await model.quickConnect(using: tunnel) }
+                        } label: {
+                            Label("Quick Connect", systemImage: "bolt.fill")
+                        }
+                        .help("Quick Connect to the fastest server")
+                        .disabled(model.isBusy)
+                    }
+
                     ToolbarItemGroup(placement: .primaryAction) {
                         Spacer()
 
@@ -468,9 +478,9 @@ private extension ContentView {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .glassEffect(in: .rect(cornerRadius: 18))
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.top, 12)
                 }
 
                 Spacer()
