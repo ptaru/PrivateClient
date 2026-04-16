@@ -602,14 +602,43 @@ private extension ContentView {
                             .foregroundStyle(.secondary)
                         }
                     } else {
-                        HStack(spacing: 6) {
-                            Text("Ready to connect")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            if let latency = model.latencyText(for: region) {
-                                Text(latency)
-                                    .font(.system(.caption2, design: .monospaced))
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text("Ready to connect")
+                                    .font(.caption2)
                                     .foregroundStyle(.secondary)
+                                if let latency = model.latencyText(for: region) {
+                                    Text(latency)
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            if supportsPortForward {
+                                Toggle(isOn: Binding(
+                                    get: { model.shouldRequestPortForward },
+                                    set: { shouldEnable in
+                                        Task { await model.setPortForwardingPreference(shouldEnable) }
+                                    }
+                                )) {
+                                    Label(
+                                        "Forward a port",
+                                        systemImage: model.shouldRequestPortForward ? "arrowshape.forward.fill" : "arrowshape.forward"
+                                    )
+                                    .font(.system(size: 9, weight: .bold))
+                                }
+                                .toggleStyle(.button)
+                                .controlSize(.mini)
+                                .buttonStyle(.plain)
+                                .foregroundStyle(model.shouldRequestPortForward ? .green : .secondary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(model.shouldRequestPortForward ? .green.opacity(0.15) : Color.primary.opacity(0.05), in: Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(model.shouldRequestPortForward ? .green.opacity(0.2) : .secondary.opacity(0.1), lineWidth: 0.5)
+                                )
+                                .help(model.shouldRequestPortForward ? "Port forwarding will be requested" : "Port forwarding is disabled")
                             }
                         }
                     }
@@ -647,20 +676,6 @@ private extension ContentView {
                 width: compactConnectionPanelRowWidth > 0 ? compactConnectionPanelRowWidth : nil,
                 alignment: .leading
             )
-
-            if supportsPortForward && !isActuallyConnected {
-                Toggle(isOn: Binding(
-                    get: { model.shouldRequestPortForward },
-                    set: { shouldEnable in
-                        Task { await model.setPortForwardingPreference(shouldEnable) }
-                    }
-                )) {
-                    Text("Forward a port for me")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .toggleStyle(.switch)
-                .disabled(isBusy)
-            }
         }
         .padding(20)
         .glassEffect(in: .rect(cornerRadius: 24))
