@@ -504,7 +504,7 @@ final class AppModel: NSObject {
         await connect(using: tunnel)
     }
 
-    func setPortForwardingPreference(_ isEnabled: Bool) async {
+    func setPortForwardingPreference(_ isEnabled: Bool) {
         shouldRequestPortForward = isEnabled
         if !isEnabled {
             stopPortForwarding(clearState: true)

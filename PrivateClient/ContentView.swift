@@ -618,7 +618,7 @@ private extension ContentView {
                                 Toggle(isOn: Binding(
                                     get: { model.shouldRequestPortForward },
                                     set: { shouldEnable in
-                                        Task { await model.setPortForwardingPreference(shouldEnable) }
+                                        model.setPortForwardingPreference(shouldEnable)
                                     }
                                 )) {
                                     Label(
