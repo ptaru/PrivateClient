@@ -18,4 +18,3 @@ xcuserdata/
 .env
 .env.*
 notary-submit.json
-scripts/release_notarize.sh
