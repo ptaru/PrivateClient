@@ -319,7 +319,7 @@ private extension ContentView {
 
                     if model.shouldRequestPortForward && supportsPortForward {
                         HStack(spacing: 6) {
-                            Image(systemName: "point.3.connected.trianglepath.dotted")
+                            Image(systemName: "arrowshape.forward")
                             Text(portForwardStatusText)
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
@@ -592,7 +592,7 @@ private extension ContentView {
                         .foregroundStyle(.secondary)
                         if model.shouldRequestPortForward && supportsPortForward {
                             HStack(spacing: 6) {
-                                Image(systemName: "point.3.connected.trianglepath.dotted")
+                                Image(systemName: "arrowshape.forward")
                                 Text(portForwardStatusText)
                                     .foregroundStyle(.secondary)
                                     .textSelection(.enabled)
@@ -912,11 +912,11 @@ private extension ContentView {
 
             HStack(spacing: 6) {
                 if region.geo == true {
-                    Image(systemName: "mappin.slash.circle")
+                    Image(systemName: "mappin.slash")
                         .help("You will appear to be in this location, even if the server is elsewhere")
                 }
                 if region.portForward == true {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                    Image(systemName: "arrowshape.forward")
                         .help("Port forwarding available")
                 }
                 if let latency = model.latencyText(for: region) {
@@ -946,11 +946,11 @@ private extension ContentView {
 
             HStack(spacing: 6) {
                 if region.geo == true {
-                    Image(systemName: "mappin.slash.circle")
+                    Image(systemName: "mappin.slash")
                         .help("You will appear to be in this location, even if the server is elsewhere")
                 }
                 if region.portForward == true {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                    Image(systemName: "arrowshape.forward")
                         .help("Port forwarding available")
                 }
                 if let latency = model.latencyText(for: region) {
