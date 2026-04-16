@@ -235,6 +235,34 @@ final class PrivateClientTests: XCTestCase {
         XCTAssertEqual(handshake.peerIP, "10.0.0.2/32")
     }
 
+    func testPortForwardSignatureDecoding() throws {
+        let json = """
+        {"status":"OK","payload":"abc","signature":"xyz","message":"port scheduled for add"}
+        """
+        let decoded = try JSONDecoder().decode(
+            PIAPortForwardSignatureResponse.self,
+            from: Data(json.utf8)
+        )
+        XCTAssertEqual(decoded.status, "OK")
+        XCTAssertEqual(decoded.payload, "abc")
+        XCTAssertEqual(decoded.signature, "xyz")
+    }
+
+    func testPortForwardPayloadDecodingFromBase64() throws {
+        let payload = """
+        {"token":"token123","port":47047,"expires_at":"2026-06-30T22:33:44.114369906Z"}
+        """
+        let base64 = Data(payload.utf8).base64EncodedString()
+        let decoded = try PIAPortForwardPayload.decodeBase64Payload(base64)
+
+        XCTAssertEqual(decoded.token, "token123")
+        XCTAssertEqual(decoded.port, 47047)
+        XCTAssertEqual(
+            ISO8601DateFormatter().string(from: decoded.expiresAt),
+            "2026-06-30T22:33:44Z"
+        )
+    }
+
     func testHostnameRegionDNSFallsBackToNumericResolver() {
         let builder = PIAProfileBuilder(certificatePEM: "CERT")
         let region = PIARegion(

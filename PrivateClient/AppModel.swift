@@ -11,7 +11,11 @@ final class AppModel: NSObject {
     var searchText = ""
     var regions: [PIARegion] = []
     var selectedRegionID: String?
-    var selectedTransport: VPNTransport = .wireGuard
+    var selectedTransport: VPNTransport = .wireGuard {
+        didSet {
+            saveSelectedTransportPreference()
+        }
+    }
     var sidebarSortMode: SidebarSortMode = .latency
     var regionLatenciesMs: [String: Double] = [:]
     var isLatencyRefreshInProgress = false
@@ -26,28 +30,46 @@ final class AppModel: NSObject {
     var isSignedIn = false
     var isMainInterfaceReady = false
     var isExpectingDisconnect = false
+    var shouldRequestPortForward = false {
+        didSet {
+            savePortForwardPreference()
+        }
+    }
+    var forwardedPort: UInt16?
+    var forwardedPortExpiresAt: Date?
+    var isPortForwardRequestInProgress = false
+    var portForwardErrorMessage: String?
+    var hasPortForwardSetupFailed = false
 
     private let apiClient: PIAAPIClientProtocol
     private let credentialStore: PIACredentialStore
     private let profileBuilder: PIAProfileBuilder
     private let regionAutoSelector: RegionAutoSelecting
+    private let preferencesStore: UserDefaults
     private var regionLatenciesByTransport: [VPNTransport: [String: Double]] = [:]
     private var latencyRefreshTask: Task<Void, Never>?
     private var latencyRefreshGeneration = 0
+    private var portForwardKeepaliveTask: Task<Void, Never>?
+    private var nextPortForwardRetryAt = Date.distantPast
+    private var portForwardSetupAttempts = 0
+    private let maxPortForwardSetupAttempts = 3
 
     init(
         apiClient: PIAAPIClientProtocol = PIAAPIClient(),
         credentialStore: PIACredentialStore = KeychainPIACredentialStore(),
         profileBuilder: PIAProfileBuilder? = nil,
-        regionAutoSelector: RegionAutoSelecting = LatencyBasedRegionAutoSelector()
+        regionAutoSelector: RegionAutoSelecting = LatencyBasedRegionAutoSelector(),
+        preferencesStore: UserDefaults = .standard
     ) {
         self.apiClient = apiClient
         self.credentialStore = credentialStore
         let certificate = (try? String(contentsOf: Self.certificateURL, encoding: .utf8)) ?? ""
         self.profileBuilder = profileBuilder ?? PIAProfileBuilder(certificatePEM: certificate)
         self.regionAutoSelector = regionAutoSelector
+        self.preferencesStore = preferencesStore
 
         super.init()
+        restoreUIPreferences()
 
         Task {
             await bootstrap()
@@ -168,6 +190,7 @@ final class AppModel: NSObject {
         latencyRefreshTask?.cancel()
         latencyRefreshTask = nil
         isLatencyRefreshInProgress = false
+        stopPortForwarding(clearState: true)
         if let currentProfileID {
             isExpectingDisconnect = true
             do {
@@ -225,6 +248,8 @@ final class AppModel: NSObject {
             errorMessage = "Select a server region first."
             return
         }
+
+        stopPortForwarding(clearState: true)
 
         if sessionStatus == .connected {
             appendLog("Switching servers. Disconnecting from current session…")
@@ -287,11 +312,17 @@ final class AppModel: NSObject {
             sessionStatus = .connected
             isExpectingDisconnect = false
             appendLog("Connected to \(region.name) using \(selectedTransport.displayName).")
+            if shouldAttemptPortForward(for: region) {
+                resetPortForwardSetupAttempts()
+                nextPortForwardRetryAt = Date().addingTimeInterval(1)
+                appendLog("Port forwarding queued. First attempt in 1 second.")
+            }
             await refreshLog(using: tunnel)
         } catch {
             let message = error.presentableDescription
             sessionStatus = .failed(message)
             errorMessage = message
+            stopPortForwarding(clearState: true)
             appendLog("Connect failed: \(message)")
         }
     }
@@ -301,6 +332,7 @@ final class AppModel: NSObject {
             return
         }
 
+        stopPortForwarding(clearState: true)
         isExpectingDisconnect = true
         sessionStatus = .disconnecting
         errorMessage = nil
@@ -327,6 +359,7 @@ final class AppModel: NSObject {
     func synchronize(with tunnel: TunnelObservable) async {
         switch tunnel.status {
         case .inactive:
+            stopPortForwarding(clearState: true)
             let previousStatus = sessionStatus
             currentProfileID = nil
             connectedRegionID = nil
@@ -359,6 +392,9 @@ final class AppModel: NSObject {
                 connectedSince = Date()
             }
             isExpectingDisconnect = false
+            if shouldAttemptPortForward(for: connectedRegion) && forwardedPort == nil {
+                await attemptPortForwardSetupIfNeeded()
+            }
         }
 
         await refreshLog(using: tunnel)
@@ -467,6 +503,26 @@ final class AppModel: NSObject {
 
         await connect(using: tunnel)
     }
+
+    func setPortForwardingPreference(_ isEnabled: Bool) async {
+        shouldRequestPortForward = isEnabled
+        if !isEnabled {
+            stopPortForwarding(clearState: true)
+            appendLog("Port forwarding disabled.")
+            return
+        }
+
+        resetPortForwardSetupAttempts()
+        portForwardErrorMessage = nil
+        nextPortForwardRetryAt = Date().addingTimeInterval(1)
+        appendLog("Port forwarding enabled.")
+        guard sessionStatus == .connected,
+              shouldAttemptPortForward(for: connectedRegion) else {
+            return
+        }
+
+        appendLog("Port forwarding queued. First attempt in 1 second.")
+    }
 }
 
 enum SidebarSortMode: String, CaseIterable, Identifiable, Sendable {
@@ -548,6 +604,30 @@ private extension NSError {
 }
 
 private extension AppModel {
+    enum UIPreferences {
+        static let selectedTransportKey = "ui.selectedTransport"
+        static let shouldRequestPortForwardKey = "ui.shouldRequestPortForward"
+    }
+
+    func restoreUIPreferences() {
+        if let rawTransport = preferencesStore.string(forKey: UIPreferences.selectedTransportKey),
+           let storedTransport = VPNTransport(rawValue: rawTransport) {
+            selectedTransport = storedTransport
+        }
+        shouldRequestPortForward = preferencesStore.bool(forKey: UIPreferences.shouldRequestPortForwardKey)
+    }
+
+    func saveSelectedTransportPreference() {
+        preferencesStore.set(selectedTransport.rawValue, forKey: UIPreferences.selectedTransportKey)
+    }
+
+    func savePortForwardPreference() {
+        preferencesStore.set(
+            shouldRequestPortForward,
+            forKey: UIPreferences.shouldRequestPortForwardKey
+        )
+    }
+
     var shouldDisplayLatencyMeasurements: Bool {
         !isLatencyRefreshInProgress
     }
@@ -665,6 +745,184 @@ private extension AppModel {
                 }
             }
         }
+    }
+
+    func beginPortForwardingIfEligible(usingToken token: String) async {
+        guard shouldRequestPortForward else {
+            return
+        }
+        guard !hasPortForwardSetupFailed else {
+            return
+        }
+        guard Date() >= nextPortForwardRetryAt else {
+            return
+        }
+        guard !isPortForwardRequestInProgress else {
+            return
+        }
+        guard sessionStatus == .connected else {
+            return
+        }
+        guard let region = connectedRegion,
+              let transport = connectedTransport else {
+            return
+        }
+        guard region.portForward == true else {
+            stopPortForwarding(clearState: true)
+            appendLog("Port forwarding unavailable for \(region.name).")
+            return
+        }
+
+        let selection = ConnectionSelection(region: region, transport: transport)
+        isPortForwardRequestInProgress = true
+        portForwardSetupAttempts += 1
+
+        do {
+            try await activatePortForwarding(selection: selection, token: token)
+            portForwardErrorMessage = nil
+            hasPortForwardSetupFailed = false
+            nextPortForwardRetryAt = .distantPast
+            portForwardSetupAttempts = 0
+        } catch {
+            stopPortForwarding(clearState: true)
+            let message = error.presentableDescription
+            portForwardErrorMessage = message
+            if portForwardSetupAttempts >= maxPortForwardSetupAttempts {
+                hasPortForwardSetupFailed = true
+                nextPortForwardRetryAt = .distantFuture
+                appendLog(
+                    "Port forwarding setup failed after \(portForwardSetupAttempts) attempts: \(message)"
+                )
+            } else {
+                nextPortForwardRetryAt = Date().addingTimeInterval(3)
+                appendLog(
+                    "Port forwarding setup attempt \(portForwardSetupAttempts)/\(maxPortForwardSetupAttempts) failed: \(message). Retrying in 3 seconds."
+                )
+            }
+        }
+        isPortForwardRequestInProgress = false
+    }
+
+    func activatePortForwarding(
+        selection: ConnectionSelection,
+        token: String
+    ) async throws {
+        stopPortForwarding(clearState: false)
+        let endpoint = try requiredEndpoint(for: selection)
+        let response = try await apiClient.getPortForwardSignature(
+            token: token,
+            gatewayIP: endpoint.ip,
+            gatewayHostname: endpoint.cn,
+            certificatePEM: profileBuilder.certificatePEM
+        )
+
+        guard response.status == "OK",
+              let payload = response.payload,
+              let signature = response.signature else {
+            throw PIAAPIError.portForwardingNotAvailable(response.message ?? "No signature returned.")
+        }
+
+        let decodedPayload = try PIAPortForwardPayload.decodeBase64Payload(payload)
+        let bindResponse = try await apiClient.bindPortForward(
+            payload: payload,
+            signature: signature,
+            gatewayIP: endpoint.ip,
+            gatewayHostname: endpoint.cn,
+            certificatePEM: profileBuilder.certificatePEM
+        )
+        guard bindResponse.status == "OK" else {
+            throw PIAAPIError.portForwardingNotAvailable(bindResponse.message ?? "bindPort failed.")
+        }
+
+        forwardedPort = decodedPayload.port
+        forwardedPortExpiresAt = decodedPayload.expiresAt
+        appendLog("Port forwarding enabled on \(decodedPayload.port).")
+
+        portForwardKeepaliveTask = Task(priority: .utility) { [weak self] in
+            guard let self else {
+                return
+            }
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(900))
+                    guard !Task.isCancelled else {
+                        return
+                    }
+
+                    let keepalive = try await self.apiClient.bindPortForward(
+                        payload: payload,
+                        signature: signature,
+                        gatewayIP: endpoint.ip,
+                        gatewayHostname: endpoint.cn,
+                        certificatePEM: self.profileBuilder.certificatePEM
+                    )
+                    guard keepalive.status == "OK" else {
+                        throw PIAAPIError.portForwardingNotAvailable(
+                            keepalive.message ?? "bindPort refresh failed."
+                        )
+                    }
+
+                    await MainActor.run {
+                        self.appendLog("Port forwarding keepalive refreshed for \(decodedPayload.port).")
+                    }
+                } catch {
+                    guard !Task.isCancelled else {
+                        return
+                    }
+                    await MainActor.run {
+                        self.appendLog("Port forwarding keepalive failed: \(error.presentableDescription)")
+                        self.stopPortForwarding(clearState: true)
+                    }
+                    return
+                }
+            }
+        }
+    }
+
+    func stopPortForwarding(clearState: Bool) {
+        portForwardKeepaliveTask?.cancel()
+        portForwardKeepaliveTask = nil
+        isPortForwardRequestInProgress = false
+
+        if clearState {
+            forwardedPort = nil
+            forwardedPortExpiresAt = nil
+            portForwardErrorMessage = nil
+        }
+    }
+
+    func attemptPortForwardSetupIfNeeded() async {
+        guard !hasPortForwardSetupFailed else {
+            return
+        }
+        do {
+            let token = try await validToken()
+            await beginPortForwardingIfEligible(usingToken: token.token)
+        } catch {
+            let message = error.presentableDescription
+            portForwardErrorMessage = message
+            if portForwardSetupAttempts >= maxPortForwardSetupAttempts {
+                hasPortForwardSetupFailed = true
+                nextPortForwardRetryAt = .distantFuture
+                appendLog(
+                    "Port forwarding setup failed after \(portForwardSetupAttempts) attempts: \(message)"
+                )
+            } else {
+                nextPortForwardRetryAt = Date().addingTimeInterval(3)
+                appendLog(
+                    "Port forwarding token refresh failed: \(message). Retrying in 3 seconds."
+                )
+            }
+        }
+    }
+
+    func resetPortForwardSetupAttempts() {
+        portForwardSetupAttempts = 0
+        hasPortForwardSetupFailed = false
+    }
+
+    func shouldAttemptPortForward(for region: PIARegion?) -> Bool {
+        shouldRequestPortForward && region?.portForward == true
     }
 
     func validToken() async throws -> PIAAuthToken {

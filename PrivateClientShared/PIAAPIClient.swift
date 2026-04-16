@@ -8,6 +8,19 @@ protocol PIAAPIClientProtocol {
         server: PIAServerEndpoint,
         certificatePEM: String
     ) async throws -> PIAWireGuardHandshake
+    func getPortForwardSignature(
+        token: String,
+        gatewayIP: String,
+        gatewayHostname: String,
+        certificatePEM: String
+    ) async throws -> PIAPortForwardSignatureResponse
+    func bindPortForward(
+        payload: String,
+        signature: String,
+        gatewayIP: String,
+        gatewayHostname: String,
+        certificatePEM: String
+    ) async throws -> PIAPortBindResponse
 }
 
 struct PIAAPIClient: PIAAPIClientProtocol {
@@ -80,6 +93,38 @@ struct PIAAPIClient: PIAAPIClientProtocol {
         return handshake
     }
 
+    func getPortForwardSignature(
+        token: String,
+        gatewayIP: String,
+        gatewayHostname: String,
+        certificatePEM: String
+    ) async throws -> PIAPortForwardSignatureResponse {
+        let data = try await PIAPortForwardCurlClient.getSignature(
+            token: token,
+            gatewayIP: gatewayIP,
+            gatewayHostname: gatewayHostname,
+            certificatePEM: certificatePEM
+        )
+        return try decoder.decode(PIAPortForwardSignatureResponse.self, from: data)
+    }
+
+    func bindPortForward(
+        payload: String,
+        signature: String,
+        gatewayIP: String,
+        gatewayHostname: String,
+        certificatePEM: String
+    ) async throws -> PIAPortBindResponse {
+        let data = try await PIAPortForwardCurlClient.bindPort(
+            payload: payload,
+            signature: signature,
+            gatewayIP: gatewayIP,
+            gatewayHostname: gatewayHostname,
+            certificatePEM: certificatePEM
+        )
+        return try decoder.decode(PIAPortBindResponse.self, from: data)
+    }
+
     static func parseServerListPayload(
         _ data: Data,
         decoder: JSONDecoder = JSONDecoder()
@@ -110,6 +155,8 @@ enum PIAAPIError: LocalizedError {
     case tlsValidationFailed
     case connectionClosed
     case commandFailed(String)
+    case portForwardingNotAvailable(String)
+    case portForwardingInvalidPayload
 
     var errorDescription: String? {
         switch self {
@@ -128,6 +175,10 @@ enum PIAAPIError: LocalizedError {
             return "The PIA WireGuard server closed the connection unexpectedly."
         case .commandFailed(let details):
             return "The WireGuard setup command failed: \(details)"
+        case .portForwardingNotAvailable(let details):
+            return "Port forwarding request failed: \(details)"
+        case .portForwardingInvalidPayload:
+            return "Port forwarding response payload could not be decoded."
         }
     }
 }
@@ -175,6 +226,91 @@ private enum PIAWireGuardCurlClient {
         }
         guard !output.isEmpty else {
             throw PIAAPIError.invalidResponse(errorOutput ?? "WireGuard handshake returned no body.")
+        }
+        return output
+    }
+
+    static func writeCertificate(_ certificatePEM: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("privateclient-pia-ca-\(UUID().uuidString).crt")
+        try certificatePEM.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+}
+
+private enum PIAPortForwardCurlClient {
+    static func getSignature(
+        token: String,
+        gatewayIP: String,
+        gatewayHostname: String,
+        certificatePEM: String
+    ) async throws -> Data {
+        let certificateURL = try writeCertificate(certificatePEM)
+        defer {
+            try? FileManager.default.removeItem(at: certificateURL)
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+        process.arguments = [
+            "-sS",
+            "-m", "10",
+            "-G",
+            "--connect-to", "\(gatewayHostname)::\(gatewayIP):",
+            "--cacert", certificateURL.path,
+            "--data-urlencode", "token=\(token)",
+            "https://\(gatewayHostname):19999/getSignature"
+        ]
+        return try runCurl(process: process)
+    }
+
+    static func bindPort(
+        payload: String,
+        signature: String,
+        gatewayIP: String,
+        gatewayHostname: String,
+        certificatePEM: String
+    ) async throws -> Data {
+        let certificateURL = try writeCertificate(certificatePEM)
+        defer {
+            try? FileManager.default.removeItem(at: certificateURL)
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+        process.arguments = [
+            "-sS",
+            "-m", "10",
+            "-G",
+            "--connect-to", "\(gatewayHostname)::\(gatewayIP):",
+            "--cacert", certificateURL.path,
+            "--data-urlencode", "payload=\(payload)",
+            "--data-urlencode", "signature=\(signature)",
+            "https://\(gatewayHostname):19999/bindPort"
+        ]
+        return try runCurl(process: process)
+    }
+
+    static func runCurl(process: Process) throws -> Data {
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        try process.run()
+        process.waitUntilExit()
+
+        let output = stdout.fileHandleForReading.readDataToEndOfFile()
+        let errorOutput = String(
+            data: stderr.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        )?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard process.terminationStatus == 0 else {
+            throw PIAAPIError.commandFailed(errorOutput ?? "curl exit \(process.terminationStatus)")
+        }
+        guard !output.isEmpty else {
+            throw PIAAPIError.invalidResponse(errorOutput ?? "Port forwarding API returned no body.")
         }
         return output
     }

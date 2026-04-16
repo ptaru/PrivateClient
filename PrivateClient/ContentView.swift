@@ -514,6 +514,7 @@ private extension ContentView {
     func compactConnectionPanel(for region: PIARegion) -> some View {
         let isActuallyConnected = model.sessionStatus == .connected && model.connectedRegion?.id == region.id
         let isBusy = model.isBusy
+        let supportsPortForward = region.portForward == true
 
         return VStack(spacing: 16) {
             Picker("Protocol", selection: $model.selectedTransport) {
@@ -524,6 +525,20 @@ private extension ContentView {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize(horizontal: true, vertical: false)
+
+            if supportsPortForward {
+                Toggle(isOn: Binding(
+                    get: { model.shouldRequestPortForward },
+                    set: { shouldEnable in
+                        Task { await model.setPortForwardingPreference(shouldEnable) }
+                    }
+                )) {
+                    Text("Forward a port for me")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .toggleStyle(.checkbox)
+                .disabled(isBusy)
+            }
 
             HStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -557,6 +572,16 @@ private extension ContentView {
                         .padding(.leading, 1)
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
+                        if model.shouldRequestPortForward && supportsPortForward {
+                            HStack(spacing: 6) {
+                                Image(systemName: "point.3.connected.trianglepath.dotted")
+                                Text(portForwardStatusText)
+                                    .textSelection(.enabled)
+                            }
+                            .padding(.leading, 1)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        }
                     } else {
                         HStack(spacing: 6) {
                             Text("Ready to connect")
@@ -600,6 +625,22 @@ private extension ContentView {
         }
         .padding(20)
         .glassEffect(in: .rect(cornerRadius: 24))
+    }
+
+    var portForwardStatusText: String {
+        if let port = model.forwardedPort {
+            return "Forwarded port \(port)"
+        }
+        if model.hasPortForwardSetupFailed {
+            return "Port forwarding setup failed"
+        }
+        if model.isPortForwardRequestInProgress {
+            return "Setting up port forwarding…"
+        }
+        if model.shouldRequestPortForward {
+            return "Setting up port forwarding…"
+        }
+        return "Forwarded port unavailable"
     }
 
     func statusCard(for region: PIARegion) -> some View {
@@ -835,7 +876,10 @@ private extension ContentView {
                     Image(systemName: "mappin.slash.circle")
                         .help("You will appear to be in this location, even if the server is elsewhere")
                 }
-                // Hidden until full port-forwarding support is implemented.
+                if region.portForward == true {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                        .help("Port forwarding available")
+                }
                 if let latency = model.latencyText(for: region) {
                     Text(latency)
                         .font(.system(size: 10, design: .monospaced))
@@ -866,7 +910,10 @@ private extension ContentView {
                     Image(systemName: "mappin.slash.circle")
                         .help("You will appear to be in this location, even if the server is elsewhere")
                 }
-                // Hidden until full port-forwarding support is implemented.
+                if region.portForward == true {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                        .help("Port forwarding available")
+                }
                 if let latency = model.latencyText(for: region) {
                     Text(latency)
                         .font(.system(size: 10, design: .monospaced))

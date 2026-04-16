@@ -166,6 +166,68 @@ struct PIAWireGuardHandshake: Codable, Equatable, Sendable {
     }
 }
 
+struct PIAPortForwardSignatureResponse: Codable, Equatable, Sendable {
+    let status: String
+    let payload: String?
+    let signature: String?
+    let message: String?
+}
+
+struct PIAPortForwardPayload: Codable, Equatable, Sendable {
+    let token: String?
+    let port: UInt16
+    let expiresAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case token
+        case port
+        case expiresAt = "expires_at"
+    }
+
+    static func decodeBase64Payload(_ payload: String) throws -> PIAPortForwardPayload {
+        guard let payloadData = Data(base64Encoded: payload) else {
+            throw PIAAPIError.portForwardingInvalidPayload
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let rawDate = try container.decode(String.self)
+            if let parsed = Self.iso8601WithFractionalSeconds.date(from: rawDate)
+                ?? Self.iso8601.date(from: rawDate) {
+                return parsed
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid expires_at date: \(rawDate)"
+            )
+        }
+
+        do {
+            return try decoder.decode(PIAPortForwardPayload.self, from: payloadData)
+        } catch {
+            throw PIAAPIError.portForwardingInvalidPayload
+        }
+    }
+
+    private static let iso8601WithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let iso8601: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+}
+
+struct PIAPortBindResponse: Codable, Equatable, Sendable {
+    let status: String
+    let message: String?
+}
+
 struct ConnectionSelection: Equatable, Sendable {
     let region: PIARegion
     let transport: VPNTransport
