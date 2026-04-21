@@ -24,7 +24,9 @@ final class AppModel: NSObject {
     var connectedSince: Date?
     var sessionStatus: SessionStatus = .signedOut
     var errorMessage: String?
-    var logLines: [String] = []
+    var logLines: [String] {
+        Array((appLogLines + tunnelLogLines).prefix(300))
+    }
     var currentProfileID: Profile.ID?
     var isBootstrapped = false
     var isSignedIn = false
@@ -53,6 +55,11 @@ final class AppModel: NSObject {
     private var nextPortForwardRetryAt = Date.distantPast
     private var portForwardSetupAttempts = 0
     private let maxPortForwardSetupAttempts = 3
+    private var pendingActivationProfileID: Profile.ID?
+    private var pendingActivationStartedAt: Date?
+    private let tunnelActivationGraceInterval: TimeInterval = 15
+    private var appLogLines: [String] = []
+    private var tunnelLogLines: [String] = []
 
     init(
         apiClient: PIAAPIClientProtocol = PIAAPIClient(),
@@ -216,7 +223,8 @@ final class AppModel: NSObject {
         regionLatenciesByTransport = [:]
         selectedRegionID = nil
         errorMessage = nil
-        logLines = []
+        appLogLines = []
+        tunnelLogLines = []
         isSignedIn = false
         isMainInterfaceReady = false
         sessionStatus = .signedOut
@@ -286,6 +294,7 @@ final class AppModel: NSObject {
                     handshake: handshake,
                     wireGuardPrivateKey: privateKey
                 )
+                beginPendingActivation(for: builtProfile.profile.id)
                 try await connectWithAuthorizationRetry(
                     profile: builtProfile.profile,
                     using: tunnel
@@ -299,6 +308,7 @@ final class AppModel: NSObject {
                     handshake: nil,
                     wireGuardPrivateKey: nil
                 )
+                beginPendingActivation(for: builtProfile.profile.id)
                 try await connectWithAuthorizationRetry(
                     profile: builtProfile.profile,
                     using: tunnel
@@ -322,6 +332,7 @@ final class AppModel: NSObject {
             let message = error.presentableDescription
             sessionStatus = .failed(message)
             errorMessage = message
+            clearPendingActivation()
             stopPortForwarding(clearState: true)
             appendLog("Connect failed: \(message)")
         }
@@ -357,40 +368,70 @@ final class AppModel: NSObject {
     }
 
     func synchronize(with tunnel: TunnelObservable) async {
+        let activeProfileID = reconcileActiveProfileID(with: tunnel)
+
         switch tunnel.status {
         case .inactive:
-            stopPortForwarding(clearState: true)
             let previousStatus = sessionStatus
-            currentProfileID = nil
-            connectedRegionID = nil
-            connectedTransport = nil
-            connectedSince = nil
-            if isAuthenticated, !isBusy {
-                if !isExpectingDisconnect, previousStatus == .connected || previousStatus == .connecting {
-                    let message = "VPN disconnected unexpectedly. Check extension permissions and Network Extension configuration."
-                    sessionStatus = .failed(message)
-                    errorMessage = message
-                    appendLog(message)
-                } else if sessionStatus != .ready {
-                    sessionStatus = .ready
+            if shouldSuppressInactiveStatusDuringActivation(previousStatus: previousStatus) {
+                currentProfileID = pendingActivationProfileID
+                sessionStatus = .connecting
+            } else {
+                stopPortForwarding(clearState: true)
+                if isAuthenticated, !isBusy {
+                    if !isExpectingDisconnect, previousStatus == .connected || previousStatus == .connecting {
+                        currentProfileID = nil
+                        connectedRegionID = nil
+                        connectedTransport = nil
+                        connectedSince = nil
+                        clearPendingActivation()
+                        let message = "VPN disconnected unexpectedly. Check extension permissions and Network Extension configuration."
+                        sessionStatus = .failed(message)
+                        errorMessage = message
+                        appendLog(message)
+                    } else if sessionStatus != .ready {
+                        currentProfileID = nil
+                        connectedRegionID = nil
+                        connectedTransport = nil
+                        connectedSince = nil
+                        clearPendingActivation()
+                        sessionStatus = .ready
+                    }
+                } else {
+                    currentProfileID = nil
+                    connectedRegionID = nil
+                    connectedTransport = nil
+                    connectedSince = nil
+                    clearPendingActivation()
                 }
             }
             isExpectingDisconnect = false
         case .activating:
+            if let activeProfileID {
+                currentProfileID = activeProfileID
+            }
             if sessionStatus != .connecting {
                 sessionStatus = .connecting
             }
         case .deactivating:
+            if let activeProfileID {
+                currentProfileID = activeProfileID
+            }
             if sessionStatus != .disconnecting {
                 sessionStatus = .disconnecting
             }
         case .active:
+            if let activeProfileID {
+                currentProfileID = activeProfileID
+                await restoreActiveTunnelContextIfNeeded(profileID: activeProfileID)
+            }
             if sessionStatus != .connected {
                 sessionStatus = .connected
             }
             if connectedSince == nil {
                 connectedSince = Date()
             }
+            clearPendingActivation()
             isExpectingDisconnect = false
             if shouldAttemptPortForward(for: connectedRegion) && forwardedPort == nil {
                 await attemptPortForwardSetupIfNeeded()
@@ -402,8 +443,8 @@ final class AppModel: NSObject {
 
     func appendLog(_ line: String) {
         let timestamp = Date().formatted(.dateTime.hour().minute().second())
-        logLines.insert("[\(timestamp)] \(line)", at: 0)
-        logLines = Array(logLines.prefix(200))
+        appLogLines.insert("[\(timestamp)] \(line)", at: 0)
+        appLogLines = Array(appLogLines.prefix(200))
     }
 
     func refreshLatencyMeasurements() {
@@ -970,7 +1011,7 @@ private extension AppModel {
                     .map(String.init)
                     .suffix(100)
                 if !externalLines.isEmpty {
-                    logLines = Array(externalLines.reversed())
+                    tunnelLogLines = Array(externalLines.reversed())
                 }
             }
             return
@@ -990,7 +1031,7 @@ private extension AppModel {
             guard case .debugLog(let log) = output else {
                 return
             }
-            logLines = Array(log.lines.map(PrivateClientConfiguration.Log.formattedLine).reversed())
+            tunnelLogLines = Array(log.lines.map(PrivateClientConfiguration.Log.formattedLine).reversed())
         } catch {
             appendLog("Tunnel log fetch failed: \(error.presentableDescription)")
             let nsError = error as NSError
@@ -1025,6 +1066,103 @@ private extension AppModel {
             try await Task.sleep(for: .milliseconds(1200))
             try await tunnel.connect(to: profile, title: title)
         }
+    }
+
+    func beginPendingActivation(for profileID: Profile.ID) {
+        pendingActivationProfileID = profileID
+        pendingActivationStartedAt = Date()
+        currentProfileID = profileID
+    }
+
+    func clearPendingActivation() {
+        pendingActivationProfileID = nil
+        pendingActivationStartedAt = nil
+    }
+
+    func shouldSuppressInactiveStatusDuringActivation(previousStatus: SessionStatus) -> Bool {
+        guard previousStatus == .connecting || previousStatus == .connected else {
+            return false
+        }
+        guard !isExpectingDisconnect,
+              let pendingActivationStartedAt else {
+            return false
+        }
+        if Date().timeIntervalSince(pendingActivationStartedAt) <= tunnelActivationGraceInterval {
+            return true
+        }
+        clearPendingActivation()
+        return false
+    }
+
+    func reconcileActiveProfileID(with tunnel: TunnelObservable) -> Profile.ID? {
+        guard let snapshot = tunnel.snapshots.values.first(where: { $0.status != .inactive }) else {
+            return nil
+        }
+        currentProfileID = snapshot.id
+        return snapshot.id
+    }
+
+    func restoreActiveTunnelContextIfNeeded(profileID: Profile.ID) async {
+        guard connectedRegionID == nil || connectedTransport == nil else {
+            return
+        }
+
+        do {
+            let strategy = TunnelObservable.sharedStrategy
+            let managers = try await strategy.fetch()
+            guard let manager = managers.first(where: { manager in
+                guard let profile = try? strategy.profile(from: manager) else {
+                    return false
+                }
+                return profile.id == profileID
+            }) else {
+                return
+            }
+            let profile = try strategy.profile(from: manager)
+            restoreConnectionContext(from: profile)
+        } catch {
+            appendLog("Active tunnel state refresh failed: \(error.presentableDescription)")
+        }
+    }
+
+    func restoreConnectionContext(from profile: Profile) {
+        guard let context = inferredConnectionContext(from: profile) else {
+            return
+        }
+
+        if let transport = context.transport, connectedTransport == nil {
+            connectedTransport = transport
+            selectedTransport = transport
+        }
+        if let region = context.region, connectedRegionID == nil {
+            connectedRegionID = region.selectionID
+            selectedRegionID = region.selectionID
+        }
+        if connectedSince == nil {
+            connectedSince = Date()
+        }
+    }
+
+    func inferredConnectionContext(from profile: Profile) -> (region: PIARegion?, transport: VPNTransport?)? {
+        let prefix = "\(PrivateClientConfiguration.appDisplayName): "
+        guard profile.name.hasPrefix(prefix) else {
+            return nil
+        }
+
+        let displayName = String(profile.name.dropFirst(prefix.count))
+        let transport = VPNTransport.allCases
+            .sorted { $0.displayName.count > $1.displayName.count }
+            .first { displayName.hasSuffix(" \($0.displayName)") }
+
+        let regionName: String
+        if let transport {
+            regionName = String(displayName.dropLast(transport.displayName.count + 1))
+        } else {
+            regionName = displayName
+        }
+
+        let region = regions.first { $0.name == regionName }
+        return (region, transport)
     }
 
     func cleanupStaleTunnelProfiles(keeping targetProfileID: Profile.ID? = nil) async throws {
